@@ -20,8 +20,7 @@ import java.util.Locale
  *
  * The ViewModel updates this via `copy()` and the Compose layer observes it
  * with `collectAsStateWithLifecycle()`. Every field here represents something
- * the UI needs to render. This mirrors the FreeFCC `AppState` design and the
- * OpenFCC `C0577y` view-state pattern.
+ * the UI needs to render. This mirrors the standard Android ViewModel + StateFlow pattern.
  */
 data class AppState(
     val status: String = "idle",
@@ -482,7 +481,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
      * connection stays open — we just bulk-write each frame.
      *
      * Returns true if at least one frame was written successfully (honest
-     * success reporting — fixes the OpenFCC false-success bug).
+     * success reporting — reports success only if writes actually succeeded).
      */
     private fun sendProfile(t: DumplTransport, profile: ProfileLoader.Profile): Boolean {
         var anySuccess = false

@@ -513,7 +513,7 @@ private fun InfoPage(state: AppState, viewModel: FccViewModel) {
                     "or directly to the drone's USB-C port. This is the USB path."
                 else if (state.transportKind == "TCP")
                     "TCP loopback at 127.0.0.1:40009. App runs ON the smart controller (RC2/RC Pro/RC Plus). " +
-                    "This is the FreeFCC/OpenFCC path."
+                    "This is the smart-controller path."
                 else
                     "No transport connected. Tap Connect on the FCC page.",
                 TextGray
@@ -619,7 +619,7 @@ private fun AboutPage() {
                 "A free and open-source Android app that unlocks FCC mode, enables 4G, " +
                 "controls LEDs, and queries device info on DJI controllers. Works on BOTH " +
                 "phone-cabled RCs (USB accessory mode — the USB path) AND smart " +
-                "controllers (TCP at 127.0.0.1:40009 — the FreeFCC/OpenFCC path). " +
+                "controllers (TCP at 127.0.0.1:40009 — the smart-controller path). " +
                 "No server. No license. No tracking. Just raw DUMPL commands from JSON " +
                 "profile files.",
                 TextGray

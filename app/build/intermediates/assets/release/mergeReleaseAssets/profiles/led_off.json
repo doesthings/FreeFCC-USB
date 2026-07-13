@@ -1,0 +1,18 @@
+{
+  "name": "LED Off",
+  "description": "Turns the aircraft arm LEDs off. Same format as LED On with value 0x00. Uses port 40007 and the wrapped frame format.",
+  "source": "Inverse of led_on.json.",
+  "sender": 130,
+  "sender_desc": "MOBILE_APP, index 4",
+  "cmd_type": 6,
+  "cmd_type_desc": "Request, NO_ACK_NEEDED, no encryption",
+  "rounds": 2,
+  "inter_frame_delay_ms": 500,
+  "inter_round_delay_ms": 0,
+  "read_window_ms": 80,
+  "port": 40007,
+  "wrapper": true,
+  "frames": [
+    { "s": 6, "i": 100, "d": 6, "p": "00", "note": "RADIO LED off (dst=REMOTE_RADIO)" }
+  ]
+}

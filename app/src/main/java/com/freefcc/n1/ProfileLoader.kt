@@ -16,11 +16,11 @@ import org.json.JSONObject
  * difference here is the addition of the Remote ID profiles and the explicit
  * `port` / `wrapper` fields for the LED frames.
  *
- * Why no server: the OpenFCC server returns the *same* 21-frame universal FCC
- * profile for every drone model (verified across 11 model codes). The FreeFCC-N1
- * app embeds the same bytes in `libdji-dumpl.so`. There is nothing
- * per-device or session-specific about FCC mode — it's a fixed DUMPL command
- * sequence. So we ship it as a JSON asset and never talk to a server.
+ * Why no server: the FCC profile is a fixed 21-frame DUMPL command sequence
+ * that works across DJI's modern controller fleet (verified across 11 model
+ * codes). There is nothing per-device or session-specific about FCC mode —
+ * it's a fixed DUMPL command sequence. So we ship it as a JSON asset and
+ * never talk to a server.
  */
 object ProfileLoader {
 

@@ -1,0 +1,221 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.freefcc.n1"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="35" />
+10
+11    <!--
+12         USB host: talk to DJI RCs / drones that present a USB accessory/device interface.
+13         This is the USB cable remote controller path.
+14    -->
+15    <uses-feature
+15-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:6:5-92
+16        android:name="android.hardware.usb.accessory"
+16-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:6:19-64
+17        android:required="false" />
+17-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:6:65-89
+18    <uses-feature
+18-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:7:5-87
+19        android:name="android.hardware.usb.host"
+19-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:7:19-59
+20        android:required="false" />
+20-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:7:60-84
+21
+22    <!-- INTERNET is only declared for parity with the original apps; the app never uses it. -->
+23    <uses-permission android:name="android.permission.INTERNET" />
+23-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:10:5-67
+23-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:10:22-64
+24    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+24-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:11:5-77
+24-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:11:22-74
+25    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+25-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:12:5-94
+25-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:12:22-91
+26    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+26-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:13:5-77
+26-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:13:22-74
+27
+28    <!-- Query DJI flight apps so we can relaunch them after enabling FCC. -->
+29    <queries>
+29-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:16:5-25:15
+30        <package android:name="dji.go.v5" />
+30-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:17:9-45
+30-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:17:18-42
+31        <package android:name="dji.go.v4" />
+31-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:18:9-45
+31-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:18:18-42
+32        <package android:name="dji.pilot" />
+32-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:19:9-45
+32-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:19:18-42
+33        <package android:name="com.dji.industry.pilot" />
+33-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:20:9-58
+33-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:20:18-55
+34        <package android:name="com.dji.industry.pilot.pe" />
+34-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:21:9-61
+34-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:21:18-58
+35        <package android:name="dji.prof.args.pad" />
+35-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:22:9-53
+35-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:22:18-50
+36        <package android:name="com.dji.vision" />
+36-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:23:9-50
+36-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:23:18-47
+37        <package android:name="dji.pilot.pad" />
+37-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:24:9-49
+37-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:24:18-46
+38    </queries>
+39
+40    <permission
+40-->[androidx.core:core:1.13.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\1d948e066420d097b7b588bcb2f931c1\transformed\core-1.13.1\AndroidManifest.xml:22:5-24:47
+41        android:name="com.freefcc.n1.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+41-->[androidx.core:core:1.13.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\1d948e066420d097b7b588bcb2f931c1\transformed\core-1.13.1\AndroidManifest.xml:23:9-81
+42        android:protectionLevel="signature" />
+42-->[androidx.core:core:1.13.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\1d948e066420d097b7b588bcb2f931c1\transformed\core-1.13.1\AndroidManifest.xml:24:9-44
+43
+44    <uses-permission android:name="com.freefcc.n1.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+44-->[androidx.core:core:1.13.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\1d948e066420d097b7b588bcb2f931c1\transformed\core-1.13.1\AndroidManifest.xml:26:5-97
+44-->[androidx.core:core:1.13.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\1d948e066420d097b7b588bcb2f931c1\transformed\core-1.13.1\AndroidManifest.xml:26:22-94
+45
+46    <application
+46-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:27:5-61:19
+47        android:allowBackup="true"
+47-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:28:9-35
+48        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+48-->[androidx.core:core:1.13.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\1d948e066420d097b7b588bcb2f931c1\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
+49        android:extractNativeLibs="false"
+50        android:icon="@mipmap/ic_launcher"
+50-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:30:9-43
+51        android:label="@string/app_name"
+51-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:29:9-41
+52        android:networkSecurityConfig="@xml/network_security_config"
+52-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:33:9-69
+53        android:roundIcon="@mipmap/ic_launcher_round"
+53-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:31:9-54
+54        android:theme="@style/Theme.FreeFCCN1"
+54-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:32:9-47
+55        android:usesCleartextTraffic="false" >
+55-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:34:9-45
+56        <activity
+56-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:36:9-55:20
+57            android:name="com.freefcc.n1.MainActivity"
+57-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:37:13-41
+58            android:configChanges="orientation|screenSize|keyboardHidden"
+58-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:39:13-74
+59            android:exported="true"
+59-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:38:13-36
+60            android:launchMode="singleTask" >
+60-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:40:13-44
+61            <intent-filter>
+61-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:41:13-44:29
+62                <action android:name="android.intent.action.MAIN" />
+62-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:42:17-69
+62-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:42:25-66
+63
+64                <category android:name="android.intent.category.LAUNCHER" />
+64-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:43:17-77
+64-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:43:27-74
+65            </intent-filter>
+66            <intent-filter>
+66-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:45:13-48:29
+67                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
+67-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:46:17-93
+67-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:46:25-90
+68                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+68-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:47:17-90
+68-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:47:25-87
+69            </intent-filter>
+70
+71            <meta-data
+71-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:49:13-51:61
+72                android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"
+72-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:50:17-82
+73                android:resource="@xml/usb_device_filter" />
+73-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:51:17-58
+74            <meta-data
+74-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:52:13-54:61
+75                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+75-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:53:17-79
+76                android:resource="@xml/usb_device_filter" />
+76-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:54:17-58
+77        </activity>
+78
+79        <service
+79-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:57:9-60:63
+80            android:name="com.freefcc.n1.DumlForegroundService"
+80-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:58:13-50
+81            android:exported="false"
+81-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:59:13-37
+82            android:foregroundServiceType="connectedDevice" />
+82-->C:\projects\formini3nonpro\app\src\main\AndroidManifest.xml:60:13-60
+83
+84        <provider
+84-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+85            android:name="androidx.startup.InitializationProvider"
+85-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+86            android:authorities="com.freefcc.n1.androidx-startup"
+86-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+87            android:exported="false" >
+87-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+88            <meta-data
+88-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+89                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+89-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+90                android:value="androidx.startup" />
+90-->[androidx.emoji2:emoji2:1.3.0] C:\Users\PC1\.gradle\caches\8.10.2\transforms\6366cf4db35be633069871ecb821f18e\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+91            <meta-data
+91-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\PC1\.gradle\caches\8.10.2\transforms\0771ae233ec0c3a47e130f408839ad43\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:29:13-31:52
+92                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+92-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\PC1\.gradle\caches\8.10.2\transforms\0771ae233ec0c3a47e130f408839ad43\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:30:17-78
+93                android:value="androidx.startup" />
+93-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\PC1\.gradle\caches\8.10.2\transforms\0771ae233ec0c3a47e130f408839ad43\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:31:17-49
+94            <meta-data
+94-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:29:13-31:52
+95                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+95-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:30:17-85
+96                android:value="androidx.startup" />
+96-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:31:17-49
+97        </provider>
+98
+99        <receiver
+99-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:34:9-52:20
+100            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+100-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:35:13-76
+101            android:directBootAware="false"
+101-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:36:13-44
+102            android:enabled="true"
+102-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:37:13-35
+103            android:exported="true"
+103-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:38:13-36
+104            android:permission="android.permission.DUMP" >
+104-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:39:13-57
+105            <intent-filter>
+105-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:40:13-42:29
+106                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+106-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:41:17-91
+106-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:41:25-88
+107            </intent-filter>
+108            <intent-filter>
+108-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:43:13-45:29
+109                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+109-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:44:17-85
+109-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:44:25-82
+110            </intent-filter>
+111            <intent-filter>
+111-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:46:13-48:29
+112                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+112-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:47:17-88
+112-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:47:25-85
+113            </intent-filter>
+114            <intent-filter>
+114-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:49:13-51:29
+115                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+115-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:50:17-95
+115-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\PC1\.gradle\caches\8.10.2\transforms\d5d5b36142bf23a1f03009ca32a6e0e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:50:25-92
+116            </intent-filter>
+117        </receiver>
+118    </application>
+119
+120</manifest>

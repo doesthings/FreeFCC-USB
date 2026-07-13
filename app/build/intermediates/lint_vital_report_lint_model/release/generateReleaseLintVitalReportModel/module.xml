@@ -1,0 +1,18 @@
+<lint-module
+    format="1"
+    dir="C:\projects\formini3nonpro\app"
+    name=":app"
+    type="APP"
+    maven="FreeFCC-N1:app:unspecified"
+    agpVersion="8.7.0"
+    buildFolder="build"
+    bootClassPath="C:\Android\Sdk\platforms\android-35\android.jar;C:\Android\Sdk\build-tools\34.0.0\core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-35">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

@@ -1,0 +1,4 @@
+#Mon Jul 13 03:16:44 IDT 2026
+base.0=C\:\\projects\\formini3nonpro\\app\\build\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
+renamed.0=classes.dex
+path.0=classes.dex
