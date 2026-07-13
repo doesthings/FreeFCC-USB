@@ -1,0 +1,17 @@
+{
+  "name": "Device Info Query",
+  "description": "Queries the controller for hardware version, bootloader version, and firmware version via the GENERAL VersionInquiry command (cmd_set=0, cmd_id=1). The response payload is parsed into a human-readable string. This is the same command used by FreeFCC and dji-firmware-tools for firmware identification.",
+  "source": "GENERAL VersionInquiry — cmd_set=0 (GENERAL), cmd_id=1 (VersionInquiry). Response layout documented in dji-firmware-tools DJIPayload_General_VersionInquiryRe: bytes 2-17 = hardware version (16-char ASCII), bytes 18-21 = bootloader version (uint32 LE), bytes 22-25 = firmware version (uint32 LE).",
+  "sender": 130,
+  "sender_desc": "MOBILE_APP, index 4",
+  "cmd_type": 0,
+  "cmd_type_desc": "Request, NO_ACK_NEEDED, no encryption",
+  "rounds": 1,
+  "inter_frame_delay_ms": 0,
+  "inter_round_delay_ms": 0,
+  "read_window_ms": 1000,
+  "needs_response": true,
+  "frames": [
+    { "s": 0, "i": 1, "d": 0, "p": "", "note": "GENERAL VersionInquiry (dst=CAMERA idx 0)" }
+  ]
+}

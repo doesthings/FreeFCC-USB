@@ -1,0 +1,16 @@
+{
+  "name": "CE Restore",
+  "description": "Resets the radio to its factory-flashed default region (CE for CE units, FCC for FCC units). Single frame. Safe undo for FCC mode. Works on all DJI controllers and drones — the CE-restore command is the one DUMPL command that is documented in the dji-firmware-tools project (all FCC unlock apps) and is not license-gated.",
+  "source": "the dji-firmware-tools DUMPL protocol documentation. Verified on all supported controllers.",
+  "sender": 130,
+  "sender_desc": "MOBILE_APP, index 4",
+  "cmd_type": 6,
+  "cmd_type_desc": "Request, NO_ACK_NEEDED, no encryption",
+  "rounds": 1,
+  "inter_frame_delay_ms": 0,
+  "inter_round_delay_ms": 0,
+  "read_window_ms": 80,
+  "frames": [
+    { "s": 6, "i": 114, "d": 32, "p": "00000000000100", "note": "RADIO reset region to default (dst=ANY idx 1)" }
+  ]
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USB accessory/device filter for DJI RCs and drones that expose a DUMPL
+     bulk endpoint over USB. This app uses these to apply FCC mode
+     directly when the phone is cabled to the controller (RC-N1/RC-N2) or
+     directly to the drone via USB-C. Vendor/Product IDs are intentionally
+     broad: most DJI controllers re-enumerate with the OS as a generic
+     USB accessory, so Android launches us via USB_ACCESSORY_ATTACHED. -->
+<resources>
+    <usb-accessory model="DJI" manufacturer="DJI" version="1.0" />
+</resources>
