@@ -176,7 +176,9 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
                 }
                 !state.isConnected -> {
                     BodyText(
-                        "Connect your phone to the bottom USB port of the RC-N1/RC-N2/RC-N3, then tap Connect."
+                        "Plug your phone into the BOTTOM USB port of the " +
+                        "RC-N1/RC-N2/RC-N3 (the service port), then tap Connect. " +
+                        "If that doesn't work, try the TOP port."
                     )
                     Spacer(Modifier.height(20.dp))
                     GlowButton("Connect", Cyan) { viewModel.connect() }
@@ -457,7 +459,7 @@ private fun AppHeader(state: AppState) {
         Spacer(Modifier.height(6.dp))
         Text(
             buildString {
-                append("v1.1")
+                append("v1.2")
                 if (state.transportKind.isNotEmpty()) append(" · ${state.transportKind}")
             },
             color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium

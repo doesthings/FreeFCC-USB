@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USB device filter for the DJI RC-N1/RC-N2/RC-N3 BOTTOM (service) port.
+     The bottom port presents as a CDC ACM serial device with
+     VID=0x2CA3 / PID=0x1020 — the same interface M4TH1EU's DJI-FCC-HACK
+     sends its FCC patch over, and where DUMPL commands are most reliably
+     accepted. This filter launches the app when the bottom port is plugged in. -->
+<resources>
+    <usb-device vendor-id="11427" product-id="4128" />
+</resources>
