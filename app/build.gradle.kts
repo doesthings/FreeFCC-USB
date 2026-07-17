@@ -12,8 +12,8 @@ android {
         applicationId = "com.freefcc.n1"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
     }
 
     buildTypes {
@@ -51,10 +51,4 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-
-    // usb-serial-for-android — CDC ACM serial support for the RC-N1 BOTTOM port.
-    // The bottom port presents as a CDC ACM serial device (VID 0x2CA3, PID 0x1020).
-    // The top port presents as an AOA accessory (manufacturer="DJI"); that one is
-    // handled by AccessoryTransport using the framework UsbManager directly.
-    implementation("com.github.mik3y:usb-serial-for-android:3.9.0")
 }

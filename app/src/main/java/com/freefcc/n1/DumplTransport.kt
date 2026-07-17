@@ -3,39 +3,32 @@ package com.freefcc.n1
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
-import com.hoho.android.usbserial.driver.UsbSerialDriver
-import com.hoho.android.usbserial.driver.UsbSerialPort
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Sends DUMPL command frames to a DJI RC-N1/RC-N2/RC-N3 controller over USB.
+ * Sends DUMPL command frames to a DJI RC-N1/RC-N2/RC-N3 controller over USB
+ * Accessory mode (AOA) on the TOP USB port — matching the NLD FCC app 1:1.
  *
- * The RC-N1 exposes **two** USB transports on **two** physical ports:
+ * The connection flow replicates NLD FCC exactly:
+ * 1. UsbManager.openAccessory() → ParcelFileDescriptor
+ * 2. Start dedicated TX thread (LinkedBlockingQueue, 3ms inter-frame delay)
+ * 3. Send bootstrap handshake (2 frames: CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
+ * 4. Send RCLink keepalive frames every 2.5s (keep the session alive)
+ * 5. Send DUMPL frames wrapped in RCLink envelope: [55 CC 49 57 len_le32 DUMPL...]
  *
- *  - **BOTTOM port (the service port)** — presents as a **CDC ACM serial**
- *    device with `VID=0x2CA3 / PID=0x1020`. This is the same interface
- *    M4TH1EU's DJI-FCC-HACK sends its patch over. DUMPL frames flow as raw
- *    serial bytes. Handled by [UsbSerialTransport] using usb-serial-for-android.
- *
- *  - **TOP port (the phone port)** — presents as an **AOA USB accessory**
- *    with `manufacturer="DJI"`. This is the pipe DJI Fly uses for flight.
- *    Handled by [AccessoryTransport] using the framework [UsbManager].
- *
- * Both transports carry identical DUMPL frames (0x55 magic + header +
- * payload + CRCs); the only difference is the wire format. The viewmodel
- * tries the BOTTOM port (CDC ACM) first — that's where DUMPL commands
- * reliably work — then falls back to the TOP port (AOA).
+ * The RCLink envelope is critical — bare DUMPL frames (just 0x55...) are rejected
+ * by the RC-N1's AOA parser. The envelope adds an 8-byte header with magic 0x55 0xCC
+ * and route bytes 0x49 0x57 ("IW") before the DUMPL frame payload.
  */
 interface DumplTransport {
-
     fun open(): Boolean
     fun write(frame: ByteArray): Boolean
     fun read(buffer: ByteArray, length: Int, timeoutMs: Int): Int
@@ -43,143 +36,46 @@ interface DumplTransport {
     val name: String
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// USB Serial (CDC ACM) transport — the BOTTOM port / M4TH1EU method
-// ════════════════════════════════════════════════════════════════════════
-
 /**
- * CDC ACM serial transport for the DJI RC-N1/RC-N2/RC-N3 **bottom** port.
+ * RCLink envelope wrapper — wraps a bare DUMPL frame in the 8-byte header
+ * that the RC-N1's AOA parser expects.
  *
- * The bottom (service) USB-C port presents as a CDC ACM serial device with
- * `VID=0x2CA3 / PID=0x1020`. We use the usb-serial-for-android library's
- * [CdcAcmSerialDriver] to open the port, set 115200 8N1 (the DUMPL baud
- * rate — same one M4TH1EU's DJI-FCC-HACK uses), and read/write raw DUMPL
- * bytes. No AOA handshake, no accessory negotiation — just a serial pipe.
- *
- * This is the transport the user should try **first**: it's the same path
- * M4TH1EU uses and is where DUMPL commands are most reliably accepted.
+ * Envelope format (matching NLD FCC's a0/v0.t() output):
+ *   [0] 0x55  magic byte 1
+ *   [1] 0xCC  magic byte 2 (RCLink header, not DUMPL 0x55-only)
+ *   [2] 0x49  route byte 1 ('I' — default from r3/d.a)
+ *   [3] 0x57  route byte 2 ('W' — default from r3/d.a)
+ *   [4-7] payload length (uint32 LE) — length of the inner DUMPL frame
+ *   [8..]  DUMPL frame bytes (starts with 0x55)
  */
-class UsbSerialTransport private constructor(
-    private val port: UsbSerialPort,
-    private val connection: UsbDeviceConnection,
-    override val name: String
-) : DumplTransport {
-
-    override fun open(): Boolean = true  // already opened in factory
-
-    override fun write(frame: ByteArray): Boolean {
-        return try {
-            port.write(frame, WRITE_TIMEOUT_MS)
-            true
-        } catch (_: IOException) {
-            false
-        }
-    }
-
-    override fun read(buffer: ByteArray, length: Int, timeoutMs: Int): Int {
-        return try {
-            // usb-serial-for-android's read() blocks up to timeoutMs, then
-            // returns however many bytes actually arrived (0 if none).
-            port.read(buffer, timeoutMs)
-        } catch (_: IOException) {
-            -1
-        }
-    }
-
-    override fun close() {
-        try { port.close() } catch (_: IOException) {}
-        try { connection.close() } catch (_: IOException) {}
-    }
-
-    companion object {
-
-        private const val ACTION_USB_PERMISSION = "com.freefcc.n1.USB_PERMISSION"
-        private const val WRITE_TIMEOUT_MS = 500
-
-        // RC-N1/RC-N2/RC-N3 bottom (service) port enumerates as CDC ACM:
-        private const val DJI_VID = 0x2CA3   // 11427
-        private const val DJI_PID = 0x1020   // 4128
-
-        // DUMPL runs at 115200 8N1 — matches M4TH1EU's DJI-FCC-HACK.
-        private const val BAUD_RATE = 115200
-
-        /**
-         * Attempts to find and open the DJI RC-N1/RC-N2/RC-N3 bottom port
-         * as a CDC ACM serial device. Returns null if no matching device is
-         * attached or permission is missing (in which case it's requested
-         * and the caller should retry after the permission broadcast).
-         */
-        fun open(context: Context): UsbSerialTransport? {
-            val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
-
-            // Find the DJI CDC ACM device by VID/PID. The default prober maps
-            // generic CDC ACM devices to CdcAcmSerialDriver automatically, but
-            // we want to target the DJI VID/PID specifically (not just any
-            // CDC ACM device the user happens to have plugged in).
-            val device: UsbDevice = usbManager.deviceList.values.firstOrNull {
-                it.vendorId == DJI_VID && it.productId == DJI_PID
-            } ?: return null
-
-            // Check / request permission.
-            if (!usbManager.hasPermission(device)) {
-                val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                    PendingIntent.FLAG_MUTABLE else 0
-                val pi = PendingIntent.getBroadcast(
-                    context, 0,
-                    Intent(ACTION_USB_PERMISSION).setPackage(context.packageName),
-                    flag
-                )
-                usbManager.requestPermission(device, pi)
-                return null
-            }
-
-            val connection = usbManager.openDevice(device) ?: return null
-
-            // Use the library's CdcAcmSerialDriver directly with the matched
-            // device — it knows how to claim the CDC ACM interface and endpoints.
-            val driver: UsbSerialDriver = CdcAcmSerialDriver(device)
-            val port: UsbSerialPort = driver.ports.firstOrNull() ?: run {
-                connection.close()
-                return null
-            }
-
-            try {
-                port.open(connection)
-                port.setParameters(BAUD_RATE, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-            } catch (_: IOException) {
-                try { port.close() } catch (_: IOException) {}
-                try { connection.close() } catch (_: IOException) {}
-                return null
-            }
-
-            return UsbSerialTransport(
-                port,
-                connection,
-                "USB Serial (CDC ACM): ${device.deviceName}"
-            )
-        }
-    }
+fun wrapRclink(dumplFrame: ByteArray, route: ByteArray = byteArrayOf(0x49, 0x57)): ByteArray {
+    val out = ByteArray(8 + dumplFrame.size)
+    out[0] = 0x55
+    out[1] = 0xCC.toByte()
+    out[2] = route[0]
+    out[3] = route[1]
+    val len = dumplFrame.size
+    out[4] = (len and 0xFF).toByte()
+    out[5] = ((len shr 8) and 0xFF).toByte()
+    out[6] = ((len shr 16) and 0xFF).toByte()
+    out[7] = ((len shr 24) and 0xFF).toByte()
+    System.arraycopy(dumplFrame, 0, out, 8, dumplFrame.size)
+    return out
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// USB Accessory (AOA) transport — the TOP port / NLD FCC method
-// ════════════════════════════════════════════════════════════════════════
-
 /**
- * USB Accessory mode transport for DJI RC-N1/RC-N2/RC-N3 controllers
- * (**top** port).
+ * USB Accessory mode transport for DJI RC-N1/RC-N2/RC-N3.
  *
- * The controller is the USB host; the phone is the accessory. We call
- * [UsbManager.openAccessory] to get a [ParcelFileDescriptor], then wrap
- * it in [FileInputStream] / [FileOutputStream] for raw byte I/O.
+ * Uses the TOP USB port where the RC presents as an AOA accessory
+ * with manufacturer="DJI". The app calls openAccessory(), gets a
+ * ParcelFileDescriptor, and wraps DUMPL frames in the RCLink envelope
+ * before writing to the FileOutputStream.
  *
- * No serial framing, no baud rate — just a raw byte pipe. The same DUMPL
- * frames (0x55 magic + header + payload + CRCs) go through as-is.
+ * A dedicated TX thread (matching NLD's "NLD-AOA-TX") drains a
+ * LinkedBlockingQueue with 3ms inter-frame delay.
  *
- * The RC-N1's top USB-C port presents as an AOA accessory with
- * manufacturer="DJI". This is the pipe DJI Fly uses for normal flight.
- * DUMPL writes over this port work on some firmware and fail on others,
- * so it's the **fallback** after the CDC ACM bottom port.
+ * The user MUST close DJI Fly before connecting — the AOA accessory
+ * is exclusive (only one app can hold it at a time).
  */
 class AccessoryTransport private constructor(
     private val inputStream: FileInputStream,
@@ -188,22 +84,71 @@ class AccessoryTransport private constructor(
     override val name: String
 ) : DumplTransport {
 
-    override fun open(): Boolean = true  // already opened in factory
+    private val queue = LinkedBlockingQueue<ByteArray>()
+    private val running = AtomicBoolean(false)
+    private var txThread: Thread? = null
+    private var keepaliveThread: Thread? = null
 
+    override fun open(): Boolean {
+        if (running.compareAndSet(false, true)) {
+            // Start TX thread (matches NLD's "NLD-AOA-TX")
+            txThread = Thread({
+                while (running.get()) {
+                    try {
+                        val frame = queue.take() // blocks until a frame is available
+                        if (frame.isEmpty()) continue
+                        try {
+                            outputStream.write(frame, 0, frame.size)
+                            outputStream.flush()
+                        } catch (_: IOException) {
+                            running.set(false)
+                            break
+                        }
+                        // 3ms inter-frame delay (matches NLD)
+                        try { Thread.sleep(3) } catch (_: InterruptedException) { break }
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                }
+            }, "AOA-TX").apply { isDaemon = true; start() }
+
+            // Start RCLink keepalive thread (matches NLD's keepalive coroutine)
+            keepaliveThread = Thread({
+                // Wait 2.5s before first keepalive (matches NLD's initialDelayMs)
+                try { Thread.sleep(2500) } catch (_: InterruptedException) { return@Thread }
+                while (running.get()) {
+                    // Keepalive 1: cmd_set=6, cmd_id=0x77, dst=0x06, payload={01,01,00,FF,FF,20,00,00}
+                    val keepalivePayload = byteArrayOf(0x01, 0x01, 0x00, 0xFF.toByte(), 0xFF.toByte(), 0x20, 0x00, 0x00)
+                    val ka1 = DumplBuilder().buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x06, keepalivePayload))
+                    try { queue.put(wrapRclink(ka1)) } catch (_: InterruptedException) { break }
+
+                    // Keepalive 2: same payload, dst=0x0E (1400)
+                    val ka2 = DumplBuilder().buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x0E, keepalivePayload))
+                    try { queue.put(wrapRclink(ka2)) } catch (_: InterruptedException) { break }
+
+                    try { Thread.sleep(2500) } catch (_: InterruptedException) { break }
+                }
+            }, "AOA-Keepalive").apply { isDaemon = true; start() }
+        }
+        return true
+    }
+
+    /**
+     * Enqueues a frame for writing. The frame should already be wrapped
+     * in the RCLink envelope. The TX thread will write it with 3ms delay.
+     */
     override fun write(frame: ByteArray): Boolean {
+        if (!running.get()) return false
         return try {
-            outputStream.write(frame)
-            outputStream.flush()
+            queue.put(frame.copyOf())
             true
-        } catch (_: IOException) {
+        } catch (_: InterruptedException) {
             false
         }
     }
 
     override fun read(buffer: ByteArray, length: Int, timeoutMs: Int): Int {
         return try {
-            // Accessory-mode reads block until data arrives or the FD closes.
-            // We approximate the timeout by reading available() bytes only.
             val avail = inputStream.available()
             if (avail <= 0) return 0
             inputStream.read(buffer, 0, minOf(length, avail))
@@ -213,6 +158,9 @@ class AccessoryTransport private constructor(
     }
 
     override fun close() {
+        running.set(false)
+        try { txThread?.interrupt() } catch (_: Exception) {}
+        try { keepaliveThread?.interrupt() } catch (_: Exception) {}
         try { inputStream.close() } catch (_: IOException) {}
         try { outputStream.close() } catch (_: IOException) {}
         try { pfd.close() } catch (_: IOException) {}
@@ -224,28 +172,22 @@ class AccessoryTransport private constructor(
 
         /**
          * Attempts to find and open a connected DJI RC-N1/RC-N2/RC-N3 controller
-         * via USB Accessory mode (top port). Returns null if no DJI accessory
-         * is found.
+         * via USB Accessory mode on the TOP port. Returns null if no DJI
+         * accessory is found.
          *
-         * The caller must have USB permission — if not, this will request it
-         * via a PendingIntent and return null (the caller should retry after
-         * the permission broadcast is received).
+         * The user must close DJI Fly first — the AOA accessory is exclusive.
          */
         fun open(context: Context): AccessoryTransport? {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
-            // Get the list of connected accessories (Android supports at most 1)
             val accessories = usbManager.accessoryList
             if (accessories.isNullOrEmpty()) return null
 
             val accessory = accessories[0]
 
-            // DJI's runtime check: manufacturer must be "DJI"
             if (accessory.manufacturer != "DJI") return null
 
-            // Check permission
             if (!usbManager.hasPermission(accessory)) {
-                // Request permission — the caller should retry after the broadcast
                 val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
                     PendingIntent.FLAG_MUTABLE else 0
                 val pi = PendingIntent.getBroadcast(
@@ -257,7 +199,6 @@ class AccessoryTransport private constructor(
                 return null
             }
 
-            // Open the accessory — returns a ParcelFileDescriptor
             val pfd = usbManager.openAccessory(accessory) ?: return null
 
             val inputStream = FileInputStream(pfd.fileDescriptor)

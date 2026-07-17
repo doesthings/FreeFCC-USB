@@ -459,7 +459,7 @@ private fun AppHeader(state: AppState) {
         Spacer(Modifier.height(6.dp))
         Text(
             buildString {
-                append("v1.2")
+                append("v1.3")
                 if (state.transportKind.isNotEmpty()) append(" · ${state.transportKind}")
             },
             color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium

@@ -15,9 +15,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Immutable UI state for the entire app.
- */
 data class AppState(
     val status: String = "idle",
     val message: String = "",
@@ -26,7 +23,6 @@ data class AppState(
     val isFccEnabled: Boolean = false,
     val isBusy: Boolean = false,
     val busyProgress: Float = 0f,
-    val aircraftSerial: String = "",
     val controllerModel: String = "",
     val transportKind: String = "",
     val autoFcc: Boolean = false,
@@ -36,25 +32,12 @@ data class AppState(
 /**
  * Manages all app state and business logic.
  *
- * 1. **Dual USB transport for RC-N1/RC-N2/RC-N3.** The RC-N1 exposes two
- *    USB transports on two physical ports:
- *      - BOTTOM port: CDC ACM serial (VID 0x2CA3 / PID 0x1020) — the
- *        service port where M4TH1EU sends its FCC patch. DUMPL writes
- *        are most reliable here. Handled by [UsbSerialTransport].
- *      - TOP port: AOA accessory (manufacturer="DJI") — the pipe DJI Fly
- *        uses for flight. Handled by [AccessoryTransport]. Used as a
- *        fallback when the bottom port isn't present.
- *    [connectInternal] tries the BOTTOM port first, then falls back to
- *    the TOP port. Whichever connects first wins.
- *
- * 2. **No license, no server, no trial.** The FCC profile is a JSON asset.
- *    The app works offline from first launch, forever.
- *
- * 3. **Honest success reporting.** We track whether `write()` actually
- *    returned true for at least one frame, and only report success if so.
- *
- * 4. **Auto-FCC.** A toggle persists across restarts. When on, the app
- *    auto-connects and applies FCC on every launch.
+ * Matches the NLD FCC app's connection flow 1:1:
+ * 1. Open AOA accessory on the TOP USB port
+ * 2. Start dedicated TX thread with 3ms inter-frame delay
+ * 3. Send bootstrap handshake (CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
+ * 4. Start RCLink keepalive thread (every 2.5s)
+ * 5. Send FCC DUMPL frames wrapped in RCLink envelope
  */
 class FccViewModel(private val app: Application) : AndroidViewModel(app) {
 
@@ -64,7 +47,6 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
     private var transport: DumplTransport? = null
     private val prefs = app.getSharedPreferences("freefcc_n1", Context.MODE_PRIVATE)
 
-    /** Called once from MainActivity.onCreate(). */
     fun init() {
         val model = try { Build.DEVICE } catch (_: Exception) { "unknown" }
         val autoEnabled = prefs.getBoolean("auto_fcc", false)
@@ -76,13 +58,11 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // --- Auto-FCC ---
-
     fun toggleAutoFcc() {
         val newValue = !_state.value.autoFcc
         prefs.edit().putBoolean("auto_fcc", newValue).apply()
         update { copy(autoFcc = newValue) }
-        log(if (newValue) "Auto-FCC enabled — will auto-connect on next launch" else "Auto-FCC disabled")
+        log(if (newValue) "Auto-FCC enabled" else "Auto-FCC disabled")
     }
 
     private fun autoConnectAndApply() {
@@ -90,230 +70,173 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             delay(1000)
             update { copy(status = "connecting", message = "Auto-connecting...") }
             if (!connectInternal()) {
-                log("Auto-FCC: controller not found — is the drone powered on / cable connected?")
-                update { copy(status = "disconnected", message = "Controller not found. Auto-FCC will retry when you tap Connect.") }
+                log("Auto-FCC: controller not found")
+                update { copy(status = "disconnected", message = "Controller not found. Make sure DJI Fly is closed and the phone is connected to the TOP USB port.") }
                 return@runOnIO
             }
             log("Auto-FCC: connected")
-            update {
-                copy(
-                    status = "connected",
-                    isConnected = true,
-                    message = "Connected. Auto-applying FCC..."
-                )
-            }
-
+            update { copy(status = "connected", isConnected = true, message = "Connected. Auto-applying FCC...") }
             delay(500)
             update { copy(status = "applying", isBusy = true, busyProgress = 0f, message = "Auto-enabling FCC...") }
-            log("Auto-FCC: enabling FCC mode...")
-
             val success = applyFccInternal()
             if (success) {
-                update {
-                    copy(
-                        status = "fcc_enabled",
-                        message = "FCC mode enabled (auto)",
-                        isFccEnabled = true,
-                        isBusy = false,
-                        busyProgress = 1f,
-                        isConnected = true
-                    )
-                }
+                update { copy(status = "fcc_enabled", message = "FCC mode enabled (auto)", isFccEnabled = true, isBusy = false, busyProgress = 1f, isConnected = true) }
                 log("Auto-FCC: FCC mode enabled")
             } else {
-                update {
-                    copy(
-                        status = "connected",
-                        message = "Auto-FCC failed — try manually",
-                        isBusy = false,
-                        busyProgress = 0f
-                    )
-                }
-                log("Auto-FCC: apply failed — try manually")
+                update { copy(status = "connected", message = "Auto-FCC failed — try manually", isBusy = false, busyProgress = 0f) }
+                log("Auto-FCC: apply failed")
             }
         }
     }
 
-    // --- Connection ---
-
-    /**
-     * Connects to the controller. Tries the CDC ACM **bottom** port first
-     * (the service port where DUMPL commands reliably work — same port
-     * M4TH1EU's DJI-FCC-HACK uses), then falls back to the AOA **top**
-     * port (the DJI Fly pipe). Whichever connects first wins.
-     */
     fun connect() {
         update { copy(status = "connecting", message = "Connecting to controller...") }
         log("Connecting to controller...")
-
+        log("Make sure DJI Fly is closed and the phone is plugged into the TOP USB port.")
         runOnIO {
             if (connectInternal()) {
                 log("Connected")
-                update {
-                    copy(
-                        status = "connected",
-                        message = "Connected. Ready to apply FCC.",
-                        isConnected = true
-                    )
-                }
+                update { copy(status = "connected", message = "Connected. Ready to apply FCC.", isConnected = true) }
             } else {
-                update {
-                    copy(
-                        status = "disconnected",
-                        message = "Controller not found. Try the BOTTOM USB port of the " +
-                            "RC-N1/RC-N2/RC-N3 first (the service port). If that doesn't " +
-                            "work, try the TOP port.",
-                        isConnected = false
-                    )
-                }
-                log("Connection failed — no DJI CDC ACM serial or AOA accessory detected")
+                update { copy(status = "disconnected", message = "Controller not found. Close DJI Fly, plug into the TOP USB port, then tap Connect.", isConnected = false) }
+                log("Connection failed — no DJI USB accessory detected")
             }
         }
     }
 
+    /**
+     * Opens the AOA accessory on the TOP port, starts the TX thread,
+     * and sends the bootstrap handshake — matching NLD FCC exactly.
+     */
     private fun connectInternal(): Boolean {
-        // 1) BOTTOM port — CDC ACM serial (VID 0x2CA3 / PID 0x1020).
-        //    This is the service port where M4TH1EU sends its FCC patch and
-        //    where DUMPL commands are most reliably accepted. Try first.
-        val serial = UsbSerialTransport.open(app)
-        if (serial != null) {
-            transport = serial
-            log("Connected via CDC ACM serial (bottom port)")
-            update {
-                copy(
-                    transportName = serial.name,
-                    transportKind = "USB-CDC"
-                )
-            }
-            return true
-        }
-
-        // 2) TOP port — AOA accessory (manufacturer="DJI").
-        //    The DJI Fly pipe. Used as a fallback.
         val accessory = AccessoryTransport.open(app)
         if (accessory != null) {
+            accessory.open() // starts TX thread + keepalive thread
             transport = accessory
-            log("Connected via AOA accessory (top port)")
-            update {
-                copy(
-                    transportName = accessory.name,
-                    transportKind = "USB-AOA"
-                )
-            }
+            update { copy(transportName = accessory.name, transportKind = "USB-AOA") }
+
+            // Send bootstrap handshake (matching NLD FCC's CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
+            sendBootstrap()
+            log("Bootstrap handshake sent")
             return true
         }
         return false
     }
 
-    // --- FCC ---
+    /**
+     * Sends the 2-frame bootstrap handshake that NLD FCC sends immediately
+     * after opening the AOA accessory.
+     *
+     * Frame 1: CONN_BOOTSTRAP_3100 — dst=0x1F, payload={0x00,0x00,0x01}
+     * Frame 2: CONN_BOOTSTRAP_0000 — dst=0x00, payload={0x00,0x00,0x01}
+     *
+     * Both frames use src=0x02 (mobile app), cmd_type=0x40 (request expecting ACK).
+     * The RC-N1 requires this handshake before accepting any DUMPL commands.
+     */
+    private fun sendBootstrap() {
+        val t = transport ?: return
+        val builder = DumplBuilder()
+        val payload = byteArrayOf(0x00, 0x00, 0x01)
 
-    /** Sends the 21-frame universal FCC unlock profile (2 rounds, 150ms between frames). */
+        // Frame 1: CONN_BOOTSTRAP_3100 — dst component 0x1F (RC-N1 FCC/link service)
+        val frame1 = builder.buildFrame(DumplFrame(
+            sender = 0x02,    // mobile app (0200)
+            cmdType = 0x40,   // request expecting ACK
+            cmdSet = 0x00,
+            cmdId = 0x00,
+            dst = 0x1F,       // component 31 (3100)
+            payload = payload
+        ))
+        t.write(wrapRclink(frame1))
+
+        // Frame 2: CONN_BOOTSTRAP_0000 — dst component 0x00 (broadcast)
+        val frame2 = builder.buildFrame(DumplFrame(
+            sender = 0x02,
+            cmdType = 0x40,
+            cmdSet = 0x00,
+            cmdId = 0x00,
+            dst = 0x00,       // broadcast (0000)
+            payload = payload
+        ))
+        t.write(wrapRclink(frame2))
+    }
+
     fun enableFcc() {
         if (!isControllerReachable()) return
         update { copy(status = "applying", isBusy = true, busyProgress = 0f, message = "Enabling FCC mode...") }
         log("Enabling FCC mode...")
-
         runOnIO {
             val success = applyFccInternal()
             if (success) {
-                update {
-                    copy(
-                        status = "fcc_enabled",
-                        message = "FCC mode enabled",
-                        isFccEnabled = true,
-                        isBusy = false,
-                        busyProgress = 1f,
-                        isConnected = true
-                    )
-                }
+                update { copy(status = "fcc_enabled", message = "FCC mode enabled", isFccEnabled = true, isBusy = false, busyProgress = 1f, isConnected = true) }
                 log("FCC mode enabled")
             } else {
-                update {
-                    copy(
-                        status = "connected",
-                        message = "FCC apply failed — RC link unreachable. Make sure the drone is on and linked.",
-                        isBusy = false,
-                        busyProgress = 0f
-                    )
-                }
+                update { copy(status = "connected", message = "FCC apply failed — is the drone on and linked?", isBusy = false, busyProgress = 0f) }
                 log("FCC apply failed — writes failed")
             }
         }
     }
 
+    /**
+     * Sends the 21-frame FCC profile, each wrapped in the RCLink envelope.
+     * The TX thread handles the 3ms inter-frame delay and keepalives run
+     * in the background to keep the session alive.
+     */
     private fun applyFccInternal(): Boolean {
         val t = transport ?: return false
         val profile = ProfileLoader.load(app, "fcc.json")
         log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds")
 
-        return sendProfile(t, profile)
-    }
-
-    /** Sends the CE restore command: a single frame that resets to factory region. */
-    fun disableFcc() {
-        if (!isControllerReachable()) return
-        update { copy(status = "restoring", isBusy = true, busyProgress = 0f, message = "Restoring CE mode...") }
-        log("Restoring CE mode...")
-
-        runOnIO {
-            val t = transport ?: return@runOnIO
-            val profile = ProfileLoader.load(app, "ce_restore.json")
-            val success = sendProfile(t, profile)
-            if (success) {
-                update { copy(status = "connected", message = "CE mode restored", isFccEnabled = false, isBusy = false) }
-                log("CE mode restored")
-            } else {
-                update { copy(status = "connected", message = "CE restore failed — RC link unreachable", isBusy = false) }
-                log("CE restore failed")
-            }
-        }
-    }
-
-    // --- Internal helpers ---
-
-    private fun isControllerReachable(): Boolean {
-        if (_state.value.isConnected && transport != null) return true
-        log("Connect to the controller first")
-        return false
-    }
-
-    /**
-     * Sends a profile's frames over the transport. The USB serial port stays
-     * open for the whole sequence — each frame is written, then we wait for
-     * the inter-frame delay so the controller has time to process it.
-     *
-     * Returns true if at least one frame was written successfully (honest
-     * success reporting — reports success only if writes actually succeeded).
-     */
-    private fun sendProfile(t: DumplTransport, profile: ProfileLoader.Profile): Boolean {
         var anySuccess = false
         val totalSends = profile.frames.size * profile.rounds
         var sent = 0
 
         for (round in 0 until profile.rounds) {
             for (frame in profile.frames) {
-                val wrote = t.write(frame)
-                if (wrote) {
+                // Wrap each DUMPL frame in the RCLink envelope before sending
+                val wrapped = wrapRclink(frame)
+                if (t.write(wrapped)) {
                     anySuccess = true
-                    // Read and discard any ACK so the buffer doesn't stall
-                    try {
-                        val ack = ByteArray(2048)
-                        t.read(ack, ack.size, profile.readWindowMs)
-                    } catch (_: Exception) {}
                 }
-
                 sent++
                 update { copy(busyProgress = sent.toFloat() / totalSends) }
-                if (profile.interFrameDelay > 0) Thread.sleep(profile.interFrameDelay)
+                // The TX thread handles the 3ms inter-frame delay internally.
+                // We add a small sleep here for the progress bar to update smoothly.
+                try { Thread.sleep(5) } catch (_: Exception) {}
             }
-            if (profile.interRoundDelay > 0 && round < profile.rounds - 1) {
-                Thread.sleep(profile.interRoundDelay)
+            if (profile.interRoundDelay > 0) {
+                try { Thread.sleep(profile.interRoundDelay) } catch (_: Exception) {}
             }
         }
         return anySuccess
     }
 
-    // --- State plumbing ---
+    fun disableFcc() {
+        if (!isControllerReachable()) return
+        update { copy(status = "restoring", isBusy = true, busyProgress = 0f, message = "Restoring CE mode...") }
+        log("Restoring CE mode...")
+        runOnIO {
+            val t = transport ?: return@runOnIO
+            val profile = ProfileLoader.load(app, "ce_restore.json")
+            var anySuccess = false
+            for (frame in profile.frames) {
+                if (t.write(wrapRclink(frame))) anySuccess = true
+            }
+            if (anySuccess) {
+                update { copy(status = "connected", message = "CE mode restored", isFccEnabled = false, isBusy = false) }
+                log("CE mode restored")
+            } else {
+                update { copy(status = "connected", message = "CE restore failed", isBusy = false) }
+                log("CE restore failed")
+            }
+        }
+    }
+
+    private fun isControllerReachable(): Boolean {
+        if (_state.value.isConnected && transport != null) return true
+        log("Connect to the controller first")
+        return false
+    }
 
     private fun update(block: AppState.() -> AppState) {
         _state.value = _state.value.block()
