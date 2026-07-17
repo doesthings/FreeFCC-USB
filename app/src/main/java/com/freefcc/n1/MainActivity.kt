@@ -38,7 +38,7 @@ import kotlin.math.sin
 import kotlin.math.PI
 
 // ═══════════════════════════════════════════════════════════════════════
-// Color palette — dark, glowing, signal-themed
+// Colors
 // ═══════════════════════════════════════════════════════════════════════
 
 private val BgDark = Color(0xFF070A14)
@@ -50,7 +50,6 @@ private val Cyan = Color(0xFF4FC3F7)
 private val Green = Color(0xFF34D399)
 private val Amber = Color(0xFFF59E0B)
 private val Red = Color(0xFFEF4444)
-private val Purple = Color(0xFFA78BFA)
 private val TextWhite = Color(0xFFF0F4FF)
 private val TextGray = Color(0xFF7A85A3)
 private val TextDim = Color(0xFF4A5374)
@@ -85,13 +84,13 @@ class MainActivity : ComponentActivity() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Root layout — 4-page pager with bottom nav
+// Root layout — 3-page pager (FCC / Log / About)
 // ═══════════════════════════════════════════════════════════════════════
 
 @Composable
 private fun AppRoot(viewModel: FccViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(initialPage = 0) { 4 }
+    val pagerState = rememberPagerState(initialPage = 0) { 3 }
     val scope = rememberCoroutineScope()
 
     val entrance = remember { Animatable(0f) }
@@ -111,7 +110,6 @@ private fun AppRoot(viewModel: FccViewModel) {
             )
             .alpha(entrance.value)
     ) {
-        // Ambient glow — decorative only
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -133,9 +131,8 @@ private fun AppRoot(viewModel: FccViewModel) {
         ) { page ->
             when (page) {
                 0 -> FccPage(state, viewModel)
-                1 -> InfoPage(state, viewModel)
-                2 -> LogPage(state)
-                3 -> AboutPage()
+                1 -> LogPage(state)
+                2 -> AboutPage()
             }
         }
 
@@ -169,7 +166,6 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
         ConnectionPill(state)
         Spacer(Modifier.height(28.dp))
 
-        // --- Main FCC card ---
         GlowCard {
             ModeBadge(state)
             Spacer(Modifier.height(20.dp))
@@ -203,133 +199,11 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
                     GlowButton("Enable FCC Mode", Cyan) { viewModel.enableFcc() }
                 }
             }
-
-            if (state.aircraftSerial.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                SerialRow(state.aircraftSerial) { viewModel.probeSerial() }
-            }
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // --- 4G card (only when connected) ---
-        AnimatedVisibility(
-            visible = state.isConnected,
-            enter = fadeIn(tween(300)) + expandVertically(tween(300)),
-            exit = fadeOut(tween(200)) + shrinkVertically(tween(200))
-        ) {
-            Column {
-                GlowCard {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        SignalWaveIcon(active = state.is4gEnabled, color = Amber, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            "4G Mode",
-                            color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (state.is4gEnabled) StatusDot(Green)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    BodyText(
-                        if (state.is4gEnabled) "4G transmission is active." else "Enable 4G transmission on the aircraft.",
-                        if (state.is4gEnabled) Green else TextGray
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    if (state.is4gBusy) {
-                        ProgressDisplay(state.busyProgress, "Sending 4G frames...")
-                    } else {
-                        GlowButton(
-                            if (state.is4gEnabled) "Turn 4G OFF" else "Turn 4G ON",
-                            Amber,
-                            filled = state.is4gEnabled
-                        ) {
-                            if (state.is4gEnabled) viewModel.disable4g() else viewModel.enable4g()
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-
-        // --- Remote ID card ---
-        AnimatedVisibility(
-            visible = state.isConnected,
-            enter = fadeIn(tween(300)) + expandVertically(tween(300)),
-            exit = fadeOut(tween(200)) + shrinkVertically(tween(200))
-        ) {
-            Column {
-                GlowCard {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            Icons.Filled.LocationOff,
-                            null,
-                            tint = if (state.remoteIdDisabled) Red else Purple,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            "Remote ID",
-                            color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (state.isRidBusy) {
-                            CircularProgressIndicator(strokeWidth = 2.dp, color = Purple, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    BodyText(
-                        if (state.remoteIdDisabled)
-                            "Remote ID broadcast is OFF. Drone will not transmit ID/location."
-                        else
-                            "Remote ID broadcast is ON (compliant). Disable to stop ID transmission.",
-                        if (state.remoteIdDisabled) Red.copy(0.85f) else TextGray
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = { viewModel.disableRemoteId() },
-                            enabled = state.isConnected && !state.isRidBusy && !state.remoteIdDisabled,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Red, contentColor = BgDark,
-                                disabledContainerColor = Red.copy(0.2f),
-                                disabledContentColor = Red.copy(0.4f)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Red.copy(0.3f)),
-                            modifier = Modifier.weight(1f).height(48.dp)
-                        ) {
-                            Text("Disable RID", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                        Button(
-                            onClick = { viewModel.enableRemoteId() },
-                            enabled = state.isConnected && !state.isRidBusy && state.remoteIdDisabled,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Transparent,
-                                contentColor = Green,
-                                disabledContainerColor = Green.copy(0.1f),
-                                disabledContentColor = Green.copy(0.3f)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.5.dp, Green.copy(0.5f)),
-                            modifier = Modifier.weight(1f).height(48.dp)
-                        ) {
-                            Text("Enable RID", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-
-        // --- Auto-FCC toggle ---
-        Spacer(Modifier.height(16.dp))
+        // Auto-FCC toggle
         GlowCard {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -360,109 +234,7 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Page 2: Info
-// ═══════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun InfoPage(state: AppState, viewModel: FccViewModel) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
-            .padding(bottom = BottomNavHeight + 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(Modifier.height(56.dp))
-        PageTitle("Device Info", Icons.Outlined.Info)
-        Spacer(Modifier.height(28.dp))
-
-        GlowCard {
-            Text("Connection", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(16.dp))
-            InfoRow("Controller", state.controllerModel.ifEmpty { "Unknown" })
-            Spacer(Modifier.height(10.dp))
-            DividerLine()
-            Spacer(Modifier.height(10.dp))
-            InfoRow(
-                "Transport",
-                state.transportKind.ifEmpty { "Disconnected" },
-                valueColor = if (state.transportKind == "USB") Cyan else if (state.transportKind == "TCP") Green else TextGray
-            )
-            Spacer(Modifier.height(10.dp))
-            DividerLine()
-            Spacer(Modifier.height(10.dp))
-            InfoRow(
-                "Status",
-                if (state.isConnected) "Connected" else "Disconnected",
-                valueColor = if (state.isConnected) Green else TextGray
-            )
-            Spacer(Modifier.height(10.dp))
-            DividerLine()
-            Spacer(Modifier.height(10.dp))
-            InfoRow("Aircraft S/N", state.aircraftSerial.ifEmpty { "Not detected" })
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        GlowCard {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Version Info", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                IconButton(
-                    onClick = { viewModel.queryDeviceInfo() },
-                    enabled = state.isConnected && !state.isQueryingInfo,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    if (state.isQueryingInfo) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, color = Cyan, modifier = Modifier.size(22.dp))
-                    } else {
-                        Icon(Icons.Default.Refresh, "Query", tint = Cyan, modifier = Modifier.size(24.dp))
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-
-            if (state.deviceInfo.isNotEmpty()) {
-                Text(
-                    state.deviceInfo,
-                    color = TextGray, fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace, lineHeight = 20.sp,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else if (!state.isConnected) {
-                BodyText("Connect to the controller first.", TextDim)
-            } else {
-                BodyText("Tap the refresh button to query version info.")
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Quick reference for which transport is active
-        GlowCard {
-            Text("Transport Info", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(12.dp))
-            BodyText(
-                if (state.transportKind == "USB")
-                    "USB connection to the RC-N1/RC-N2/RC-N3. App runs on your phone, " +
-                    "sending DUMPL commands over the USB cable to the controller."
-                else if (state.transportKind == "TCP")
-                    "TCP loopback at 127.0.0.1:40009. App is running on a smart controller " +
-                    "(RC2/RC Pro/RC Plus). For smart controllers, use FreeFCC instead."
-                else
-                    "No transport connected. Plug your phone into the RC-N1/RC-N2/RC-N3 via USB, then tap Connect on the FCC page.",
-                TextGray
-            )
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Page 3: Log
+// Page 2: Log
 // ═══════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -498,16 +270,13 @@ private fun LogPage(state: AppState) {
                         val color = when {
                             entry.contains("enabled", true) ||
                             entry.contains("connected", true) ||
-                            entry.contains("restored", true) ||
-                            entry.contains("received", true) -> Green
+                            entry.contains("restored", true) -> Green
 
                             entry.contains("fail", true) ||
                             entry.contains("error", true) -> Red
 
                             entry.contains("Enabling", true) ||
                             entry.contains("Disabling", true) ||
-                            entry.contains("Probing", true) ||
-                            entry.contains("Querying", true) ||
                             entry.contains("Loaded", true) -> Amber
 
                             else -> Cyan.copy(0.6f)
@@ -532,7 +301,7 @@ private fun LogPage(state: AppState) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Page 4: About
+// Page 3: About
 // ═══════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -552,13 +321,13 @@ private fun AboutPage() {
         GlowCard {
             Text("FreeFCC-N1", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(6.dp))
-            Text("Open-source FCC unlock for DJI RC-N1 / RC-N2", color = Cyan, fontSize = 13.sp)
+            Text("Open-source FCC unlock for DJI RC-N1 / RC-N2 / RC-N3", color = Cyan, fontSize = 13.sp)
             Spacer(Modifier.height(16.dp))
             BodyText(
-                "A free and open-source Android app that unlocks FCC mode, enables 4G, " +
-                "and queries device info on DJI controllers that connect " +
-                "via USB cable to your phone (RC-N1, RC-N2). No server. No license. " +
-                "No tracking. Just raw DUMPL commands from JSON profile files.",
+                "A free and open-source Android app that unlocks FCC mode on DJI drones " +
+                "when using an RC-N1, RC-N2, or RC-N3 controller (the ones without a screen). " +
+                "No server. No license. No tracking. Just raw DUMPL commands from a JSON " +
+                "profile file.",
                 TextGray
             )
         }
@@ -572,7 +341,7 @@ private fun AboutPage() {
                 "The app sends DUMPL commands to your DJI controller over the USB cable. " +
                 "DUMPL is DJI's internal command protocol. Each command is a small binary " +
                 "packet with a magic byte (0x55), a header, a payload, and two CRC checksums. " +
-                "The app builds these packets from JSON profile files you can inspect and edit.",
+                "The app builds these packets from a JSON profile file you can inspect and edit.",
                 TextGray
             )
         }
@@ -587,7 +356,7 @@ private fun AboutPage() {
             val supported = listOf(
                 "RC-N1 (USB cabled to phone)",
                 "RC-N2 (USB cabled to phone)",
-                "Direct USB-to-drone (USB-C, fallback)"
+                "RC-N3 (USB cabled to phone)"
             )
             supported.forEach {
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -600,14 +369,14 @@ private fun AboutPage() {
             BodyText("Drones — universal profile covers ALL:", Cyan.copy(0.8f))
             Spacer(Modifier.height(8.dp))
             val drones = listOf(
-                "Mini 3 (wm163) — the target of this build",
-                "Mini 3 Pro (wm162)",
-                "Mini 4 Pro (wa140) / Mini 5 Pro (wa150)",
-                "Mini 2 / Mini (Mavic Mini)",
-                "Air 3 / Air 3S / Air 2S",
-                "Mavic 3 series / Mavic 4 Pro",
-                "Avata / Avata 2 / FPV / Flip / Neo",
-                "Phantom 4 series"
+                "Mini 3 (the target of this build)",
+                "Mini 3 Pro / Mini 4 Pro / Mini 5 Pro",
+                "Mini 2 / Mini 2 SE / Mini 4K / Mini (Mavic Mini)",
+                "Air 3 / Air 3S / Mavic Air / Air 2 / Air 2S",
+                "Mavic 3 / Classic / Pro / Mavic 4 Pro",
+                "Mavic Pro series / Mavic 2 Pro/Zoom",
+                "Avata / Avata 2 / FPV / FPV 2 / Flip / Neo / Neo 2",
+                "Phantom 4 STD/ADV/PRO/PRO V2/MS / Inspire 2 / Spark"
             )
             drones.forEach {
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -626,11 +395,9 @@ private fun AboutPage() {
             BodyText(
                 "This software is provided for educational and research purposes only. " +
                 "Modifying radio transmission parameters may violate laws in your country. " +
-                "In most places, increasing radio power beyond legal limits requires " +
-                "authorization from the relevant regulatory authority.\n\n" +
                 "You are solely responsible for ensuring your use complies with all applicable " +
-                "local, regional, and national laws. If you are unsure whether FCC mode is " +
-                "legal where you live, do not use this tool.\n\n" +
+                "laws. If you are unsure whether FCC mode is legal where you live, do not use " +
+                "this tool.\n\n" +
                 "Not affiliated with DJI. Using this tool may void your warranty and DJI " +
                 "Care Refresh coverage.",
                 TextGray
@@ -644,7 +411,7 @@ private fun AboutPage() {
             Spacer(Modifier.height(12.dp))
             InfoRow("Protocol", "DUMPL")
             Spacer(Modifier.height(12.dp))
-            InfoRow("Transports", "USB (RC-N1/N2)")
+            InfoRow("Transport", "USB serial (CDC ACM)")
             Spacer(Modifier.height(12.dp))
             InfoRow("Server", "None (fully offline)")
         }
@@ -691,7 +458,6 @@ private fun AppHeader(state: AppState) {
         Text(
             buildString {
                 append("v1.0")
-                if (state.controllerModel.isNotEmpty()) append(" · ${state.controllerModel}")
                 if (state.transportKind.isNotEmpty()) append(" · ${state.transportKind}")
             },
             color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium
@@ -842,29 +608,6 @@ private fun BodyText(text: String, color: Color = TextGray) {
 }
 
 @Composable
-private fun SerialRow(serial: String, onRefresh: () -> Unit) {
-    Surface(
-        color = BgLight.copy(0.4f),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Icon(Icons.Filled.Flight, null, tint = Cyan.copy(0.6f), modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("S/N: ", color = TextGray, fontSize = 12.sp)
-            Text(serial, color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onRefresh, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Refresh, "Refresh", tint = TextGray, modifier = Modifier.size(16.dp))
-            }
-        }
-    }
-}
-
-@Composable
 private fun InfoRow(label: String, value: String, valueColor: Color = TextWhite) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -879,13 +622,6 @@ private fun InfoRow(label: String, value: String, valueColor: Color = TextWhite)
 @Composable
 private fun DividerLine(alpha: Float = 0.5f) {
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CardBorder.copy(alpha)))
-}
-
-@Composable
-private fun StatusDot(color: Color) {
-    val pulse = rememberInfiniteTransition(label = "dot")
-    val alpha by pulse.animateFloat(0.5f, 1f, infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "dotPulse")
-    Box(modifier = Modifier.size(10.dp).background(color.copy(alpha), CircleShape))
 }
 
 @Composable
@@ -930,35 +666,6 @@ private fun GlowButton(
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Animated signal wave icon (decorative)
-// ═══════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun SignalWaveIcon(active: Boolean, color: Color, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "wave")
-    val phase by transition.animateFloat(
-        0f, (2 * PI).toFloat(),
-        infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart),
-        label = "wavePhase"
-    )
-
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val centerY = h / 2
-        val amplitude = if (active) h * 0.25f else h * 0.08f
-        val lineColor = if (active) color else color.copy(0.35f)
-
-        val path = androidx.compose.ui.graphics.Path()
-        for (x in 0..w.toInt() step 2) {
-            val y = centerY + amplitude * sin((x / w).toDouble() * 2.0 * PI + phase.toDouble()).toFloat()
-            if (x == 0) path.moveTo(x.toFloat(), y) else path.lineTo(x.toFloat(), y)
-        }
-        drawPath(path, lineColor, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 // Bottom navigation bar
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -970,9 +677,8 @@ private fun BottomNavBar(
 ) {
     val tabs = listOf(
         Triple("FCC", Icons.Filled.Wifi, Cyan),
-        Triple("Info", Icons.Filled.Info, Green),
         Triple("Log", Icons.Filled.History, Amber),
-        Triple("About", Icons.Filled.Info, Purple)
+        Triple("About", Icons.Filled.Info, Green)
     )
 
     Surface(

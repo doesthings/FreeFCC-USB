@@ -4,10 +4,7 @@
     <!-- USB host: the RC-N1/RC-N2/RC-N3 enumerates as a USB CDC ACM serial device. -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
-    <!-- INTERNET is only declared for parity; the app never uses it. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Query DJI flight apps so we can relaunch them after enabling FCC. -->
@@ -40,7 +37,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Launch the app automatically when a DJI RC is plugged in via USB -->
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
@@ -49,9 +45,5 @@
                 android:resource="@xml/usb_device_filter" />
         </activity>
 
-        <service
-            android:name=".DumlForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
     </application>
 </manifest>
