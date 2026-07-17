@@ -2,11 +2,11 @@
 
 # FreeFCC-N1
 
-### Open-source FCC unlock for DJI USB-cabled controllers
+### Open-source FCC unlock for DJI RC-N1 / RC-N2 / RC-N3 controllers
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
 
-A free and open-source Android app that unlocks FCC mode, enables 4G transmission, toggles Remote ID, controls LEDs, and queries device info on DJI controllers that connect via **USB cable to a phone/tablet** (RC-N1, RC-N2) — and also works on smart controllers (RC2, RC Pro, RC Plus) over TCP. No server. No license. No tracking. Just raw DUMPL commands from JSON profile files.
+A free and open-source Android app that unlocks FCC mode on DJI drones when you're using an **RC-N1, RC-N2, or RC-N3 controller** — the "dumb" controllers without a screen that connect to your phone via USB cable. If you keep losing signal on your Mini 3 in CE mode, this switches the radio to FCC mode for higher power and more range. No server. No license. No tracking. Just raw DUMPL commands from JSON profile files.
 
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20this%20project-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/freefcc)
 
@@ -40,80 +40,105 @@ If FreeFCC-N1 helped you out, please consider buying me a coffee. It helps cover
 
 ---
 
+> ## ⚠️ Untested on real hardware
+>
+> This app has **not been tested on a real drone yet**. The DUMPL frames are based on the publicly documented [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) protocol and loopback captures. The USB serial path for the RC-N1/RC-N2/RC-N3 has not been verified against a real drone.
+>
+> If you test it, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know the result (success or failure, your drone model, controller, and firmware version).
+
+---
+
+## What this fixes
+
+If you're flying a **Mini 3** (or any DJI drone) with the stock **RC-N1** controller in a CE region, you've probably noticed the signal drops out well before the advertised range. CE mode caps the radio power at 0.5W on 2.4GHz; FCC mode allows 2W. That's a 4x power difference.
+
+This app switches the radio from CE to FCC mode over the USB cable between your phone and the RC-N1/RC-N2/RC-N3. The same method the paid apps use, but free and open source.
+
+> **For smart controllers** (RC2, RC Pro, RC Plus — the ones with a built-in screen) — use [FreeFCC](https://github.com/doesthings/FreeFCC) instead. That app runs directly on the controller and connects via TCP. This app (FreeFCC-N1) is specifically for the USB-cabled controllers without a screen.
+
 ## Features
 
 | Feature | Description |
 |---------|-------------|
 | **FCC Unlock** | Switches the radio from CE to FCC mode for higher power and more channels |
-| **4G Activation** | Enables 4G transmission on the aircraft (serial read at runtime) |
+| **4G Activation** | Enables 4G transmission on the aircraft (requires DJI Cellular Dongle 2) |
 | **Remote ID Toggle** | Disable or enable Remote ID broadcast |
 | **LED Control** | Turn aircraft arm LEDs on or off (requires DJI Fly running with aircraft connected) |
 | **Device Info** | Queries the controller for hardware and firmware version |
 | **Auto-FCC** | Toggle to automatically connect and apply FCC every time the app opens |
-| **Dual Transport** | USB (phone+RC-N1/N2) AND TCP (smart controllers) — auto-detected |
 | **Offline** | Everything runs locally. No internet, no server, no tracking |
 | **Open Profiles** | Command frames are plain JSON files you can inspect and edit |
 | **No License** | No activation, no trial, no tracking, no server contact |
 
 ## Compatibility
 
-**Works on every DJI controller type** — the app auto-detects the transport.
+**Designed for: USB-cabled controllers without a screen (RC-N1, RC-N2, RC-N3) + phone/tablet.**
 
-> ⚠️ **This app is untested on real hardware.** The DUMPL frames are based on the publicly documented [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) protocol and loopback captures on a smart controller. The USB path for RC-N1/RC-N2 controllers has not been verified against a real Mini 3 non-pro yet. If you test it, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) with the result.
+| Controller | Transport | Status |
+|------------|-----------|--------|
+| **RC-N1** (cabled to phone) | USB serial (CDC ACM, 19200 baud) | Untested — should work |
+| **RC-N2** (cabled to phone) | USB serial (CDC ACM, 19200 baud) | Untested — should work |
+| **RC-N3** (cabled to phone) | USB serial (CDC ACM, 19200 baud) | Untested — should work |
+| Direct USB-to-drone (USB-C) | USB serial | Untested — fallback path |
 
-| Controller type | Examples | Transport | Status |
-|-----------------|----------|-----------|--------|
-| **USB remotes** | RC-N1, RC-N2 (phone cabled) | USB accessory/device | Untested — should work |
-| **Smart controllers** | RC2, RC Pro, RC Pro 2, RC Plus, Smart Controller | TCP 127.0.0.1:40009 | Untested — should work |
-| **Direct USB-to-drone** | Any drone with USB-C | USB device mode | Untested — fallback path |
+> For **smart controllers** (RC2, RC Pro, RC Plus — the ones with a screen), use [FreeFCC](https://github.com/doesthings/FreeFCC) instead.
 
 **The FCC profile is universal** — the same 21-frame DUMPL sequence works on every DJI aircraft:
 
 | Drone | Model code | FCC | 4G | Remote ID | LED |
 |-------|-----------|-----|-----|-----------|-----|
-| Mini 3 | wm163 | ✅ | N/A | ✅ | ✅ |
+| **Mini 3** | wm163 | ✅ | N/A | ✅ | ✅ |
 | Mini 3 Pro | wm162 | ✅ | N/A | ✅ | ✅ |
 | Mini 4 Pro | wa140 | ✅ | N/A | ✅ | ✅ |
+| Mini 4K | — | ✅ | N/A | ✅ | ✅ |
 | Mini 5 Pro | wa150 | ✅ | N/A | ✅ | ✅ |
-| Mini 2 / Mini | wm161/wm160 | ✅ | N/A | ✅ | ✅ |
+| Mini 2 / Mini 2 SE | wm161 | ✅ | N/A | ✅ | ✅ |
+| Mini (Mavic Mini) | wm160 | ✅ | N/A | ✅ | ✅ |
 | Air 3 / Air 3S | wa233/wa234 | ✅ | ? | ✅ | ✅ |
-| Mavic 3 series | wm260+ | ✅ | ? | ✅ | ✅ |
+| Mavic Air / Air 2 / Air 2S | — | ✅ | ? | ✅ | ✅ |
+| Mavic 3 / Classic / Pro | wm260+ | ✅ | ? | ✅ | ✅ |
 | Mavic 4 Pro | wa341 | ✅ | ✅ | ✅ | ✅ |
+| Mavic Pro series / Mavic 2 Pro/Zoom | — | ✅ | ? | ✅ | ✅ |
 | Avata / Avata 2 | wm169/wa520 | ✅ | ? | ✅ | ✅ |
-| FPV / Neo / Flip | various | ✅ | N/A | ✅ | ✅ |
-| Phantom 4 series | various | ✅ | N/A | ✅ | ✅ |
+| FPV Racer / FPV Racer 2 | — | ✅ | N/A | ✅ | ✅ |
+| Flip / Neo / Neo 2 | various | ✅ | N/A | ✅ | ✅ |
+| Phantom 4 STD / ADV / PRO / PRO V2 / MS | — | ✅ | N/A | ✅ | ✅ |
+| Inspire 2 | — | ✅ | N/A | ✅ | ✅ |
+| Spark | — | ✅ | N/A | ✅ | ✅ |
 
 If you test it on a model or firmware version not listed here, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know.
 
 ## How to Use
 
-### Phone + USB RC (covers Mini 3 / Mini 3 Pro / Mini 4 Pro / Air 3 / etc.)
+> **Important:** You need to repeat these steps every time you turn on the drone and/or remote. FCC mode is a RAM-only setting — it reverts to the factory region on power cycle.
 
-1. Power on the drone and link it to the RC
-2. **Open DJI Fly** on your phone, connect to the drone, wait for the GPS home point to update
-3. **Close DJI Fly** (it may reset CE on reconnect — closing it first prevents that)
-4. **Open FreeFCC-N1**, tap **Connect** — the app detects the USB accessory and connects
-5. Tap **Enable FCC Mode** and wait for the green checkmark
-6. **Reopen DJI Fly** from the launcher — the radio stays in FCC mode
+### Method 1: Standard controller USB method
 
-### Direct USB-to-drone (for setups that revert CE on reconnect)
+This is the normal method. FCC Mode is enabled through the USB connection between your phone and the RC-N1/RC-N2/RC-N3.
+
+1. Turn on the drone and remote and wait a few seconds for them to connect
+2. Connect your phone to the **bottom USB port** of the remote
+3. Open FreeFCC-N1, tap **Connect** — the app detects the USB serial connection to the RC
+4. Tap **Enable FCC Mode** and wait for the green checkmark
+5. **Disconnect your phone from the bottom USB port** of the remote and connect it to the **top USB port**
+6. Open DJI Fly and enjoy your drone with FCC mode
+
+### Method 2: Direct USB-to-drone method
+
+Some drones, DJI Fly versions, or firmware versions may reset back to CE Mode when DJI Fly reconnects to the aircraft. If Method 1 doesn't stick, use this method instead.
 
 1. On your main flight device, open DJI Fly and connect to the drone
-2. Wait for the GPS home point to update
-3. Use a **second Android device** connected directly to the drone via USB-C
-4. On the second device, open FreeFCC-N1, tap **Connect**, then **Enable FCC Mode**
-5. The drone switches to FCC while DJI Fly stays connected on the main device
+2. Wait until the GPS home point has been updated
+3. **Keep DJI Fly running and connected** on your main device
+4. Use a **second Android device** connected directly to the drone's USB-C port (cable straight to the drone, not to the RC)
+5. On the second device, open FreeFCC-N1, tap **Connect**, then **Enable FCC Mode**
+6. The drone switches to FCC mode while DJI Fly stays connected on the main device
 
-### Smart controller (RC2 / RC Pro / RC Plus)
-
-1. Install this app on the smart controller itself
-2. Power on the drone and link it to the controller
-3. Open FreeFCC-N1, tap **Connect** (connects via TCP at `127.0.0.1:40009`)
-4. Tap **Enable FCC Mode** and wait for the green checkmark
+> Your main flight device can still be Android or iOS. The second Android device is only used to enable FCC Mode directly on the drone while DJI Fly remains connected.
 
 ### Other features
 
-- **4G**: tap **Turn 4G ON** (the drone needs to be connected so the app can read its serial number). Requires DJI Cellular Dongle 2.
+- **4G**: tap **Turn 4G ON** (the drone needs to be connected so the app can read its serial number). Requires DJI Cellular Dongle 2. Mini series does not support 4G.
 - **Remote ID**: tap **Disable RID** or **Enable RID** to toggle Remote ID broadcast.
 - **LED**: tap **LED ON** / **LED OFF** (requires DJI Fly running with aircraft connected).
 - **Info**: tap the refresh button on the Info page to query the controller's hardware and firmware version.
@@ -124,6 +149,23 @@ Open the DJI Fly app and go to the Transmission tab. Look at the horizontal bar 
 
 - If it lines up with the **1km mark**, your drone is in **CE mode**
 - If it falls **below** the 1km mark (extends further), your drone is in **FCC mode**
+
+Check the images below for reference.
+
+<table>
+<tr>
+<td align="center"><b>FCC Mode</b></td>
+<td align="center"><b>CE Mode</b></td>
+</tr>
+<tr>
+<td><img src=".github/fcc.webp" alt="FCC mode"></td>
+<td><img src=".github/ce.webp" alt="CE mode"></td>
+</tr>
+<tr>
+<td align="center" style="color:#34D399">Signal extends past 1km</td>
+<td align="center" style="color:#7A85A3">Signal barely reaches 1km</td>
+</tr>
+</table>
 
 > If the signal graph hasn't changed, power cycle the controller and try again. Make sure the drone is powered on and linked before enabling FCC.
 
@@ -147,30 +189,11 @@ Every contribution helps cover server costs and keeps development going. Thank y
 
 ## How It Works
 
-The app sends DUMPL commands to the controller. DUMPL is DJI's internal command protocol, publicly documented in the [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) project.
+The app sends DUMPL commands to the controller over the USB cable. DUMPL is DJI's internal command protocol, publicly documented in the [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) project.
 
-Each command is a small binary packet with a magic byte (`0x55`), a header with sender and receiver info, a payload, and two CRC checksums. The app builds these packets from JSON profile files and sends them over either USB (phone+RC) or TCP (smart controller).
+The RC-N1/RC-N2/RC-N3 enumerates as a USB CDC ACM serial device (DJI vendor ID 0x2CA3) at 19200 baud. The app opens the serial port and writes DUMPL frames as raw bytes — the controller forwards them to the drone over the radio link.
 
-### Dual transport — the key innovation
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       FreeFCC-N1 app                         │
-│                                                             │
-│  JSON profiles → DumplBuilder → wire-format DUMPL frames    │
-│                                                             │
-│  Auto-detect:  ┌─ USB accessory? → UsbTransport (bulk)      │
-│                ├─ USB device?    → UsbTransport (bulk)      │
-│                └─ TCP 40009?     → TcpTransport (loopback)  │
-└─────────────────────────────────────────────────────────────┘
-                          │
-            ┌─────────────┴─────────────┐
-            ▼                           ▼
-   Phone cabled to RC-N1/RC-N2     Smart controller (RC2/RC Pro/RC Plus)
-   (USB accessory mode)           (TCP proxy at 127.0.0.1:40009)
-```
-
-The same 21-frame FCC sequence goes over both transports. The frames are byte-identical. Only the carrier differs.
+Each command is a small binary packet with a magic byte (`0x55`), a header with sender and receiver info, a payload, and two CRC checksums. The app builds these packets from JSON profile files and sends them through the USB serial port.
 
 ### FCC Profile
 
@@ -178,9 +201,9 @@ The same 21-frame FCC sequence goes over both transports. The frames are byte-id
 
 ### 4G Profile
 
-128 frames sent in a single round with 10ms between each. Each frame carries the aircraft's serial number in its payload. The serial is read from the controller at runtime by listening for telemetry on the DUMPL socket. On smart controllers these frames go via Unix domain socket at `/duss/mb/0x205`; on USB setups they go through the bulk endpoint with `dst=238`.
+128 frames sent in a single round with 10ms between each. Each frame carries the aircraft's serial number in its payload. The serial is read from the controller at runtime by listening for telemetry on the DUMPL socket.
 
-4G activation requires a DJI Cellular Dongle 2 to be physically connected to the aircraft. Without the dongle, the frames will fail to send.
+4G activation requires a DJI Cellular Dongle 2 to be physically connected to the aircraft. Without the dongle, the frames will fail to send. Mini series does not support 4G.
 
 ### Remote ID
 
@@ -206,7 +229,7 @@ You can open these files in any text editor, read every byte that gets sent, and
 
 ### How the Frames Were Obtained
 
-The DUMPL proxy on DJI smart controllers listens on `127.0.0.1:40009` and accepts plain unencrypted TCP connections. The command frames were identified by capturing loopback traffic on the controller while the radio was active, then extracting the `0x55`-prefixed DUMPL packets from the capture:
+The command frames were identified by capturing loopback traffic on a DJI smart controller while the radio was active, then extracting the `0x55`-prefixed DUMPL packets from the capture:
 
 ```bash
 tcpdump -i lo -w /sdcard/capture.pcap port 40009
@@ -214,7 +237,7 @@ tcpdump -i lo -w /sdcard/capture.pcap port 40009
 
 The frames are plaintext on the local socket with no encryption. Once captured, the payloads were decoded using the publicly documented command set and device type enums from the [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) project (GPL-3.0). This project's `DumplBuilder` class implements the same CRC-8 (polynomial 0x8C, init 0x77) and CRC-16 (polynomial 0x1021 reflected, init 0x3692) as the reference implementation to build valid frames from the decoded command definitions.
 
-The USB transport path (for RC-N1/RC-N2) uses Android's standard `UsbAccessory` / `UsbDevice` APIs — no protocol differences, the same DUMPL frames go through the USB bulk endpoint.
+The USB serial transport (for RC-N1/RC-N2/RC-N3) uses the [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) library to open the CDC ACM serial port at 19200 baud — the same DUMPL frames go through the serial connection to the controller.
 
 ## Project Structure
 
@@ -231,7 +254,7 @@ app/src/main/
     led_off.json      1 frame, LED off (wrapped, port 40007)
   java/com/freefcc/n1/
     DumplBuilder.kt     Frame builder (CRC-8/16 tables)
-    DumplTransport.kt   DumplTransport interface + TcpTransport + UsbTransport
+    DumplTransport.kt   DumplTransport interface + UsbSerialTransport + TcpTransport
     ProfileLoader.kt    JSON profile loader + 4G serial injection + LED wrapper
     FccViewModel.kt     State management + business logic
     MainActivity.kt     Compose UI with animations
@@ -248,10 +271,6 @@ app/src/main/
 Requirements: Java 17+, Android SDK 35.
 
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot"
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-
-cd C:\projects\formini3nonpro
 java -classpath gradle\wrapper\gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain assembleRelease --no-daemon
 ```
 

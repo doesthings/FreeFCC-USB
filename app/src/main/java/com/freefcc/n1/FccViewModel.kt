@@ -50,11 +50,12 @@ data class AppState(
  *
  * Design notes:
  *
- * 1. **Dual transport.** Unlike the TCP-only FCC tools,
- *    this app auto-detects which transport is available. On smart controllers
- *    (RC2/RC Pro/RC Plus) the TCP proxy at 127.0.0.1:40009 is used. On
- *    phones/tablets cabled to a DJI RC-N1/RC-N2 or directly to the drone,
- *    the USB bulk endpoint is used. The same DUMPL frames go over both.
+ * 1. **USB serial for RC-N1/RC-N2/RC-N3.** This app connects to the controller
+ *    over a CDC ACM serial link at 19200 baud through the USB cable
+ *    between your phone and the RC. The RC-N1 enumerates as a USB device
+ *    with vendor ID 0x2C93 and product ID 0x1020. We open it with the
+ *    usb-serial-for-android library and write DUMPL frames as raw bytes.
+ *    TCP loopback is kept as a fallback for smart controllers.
  *
  * 2. **No license, no server, no trial.** There is no license check, no
  *    integrity check, no self-update, no server contact. The FCC profile
@@ -62,7 +63,8 @@ data class AppState(
  *
  * 3. **Honest success reporting.** We track whether `write()` actually
  *    returned true for at least one frame, and only report success if so.
- *    This fixes the false-success bug identified in the false-success bug.
+ *    This avoids the false-success bug where the socket opens but every
+ *    write silently fails, yet the app reports "FCC enabled".
  *
  * 4. **Auto-FCC.** A toggle persists across restarts. When on, the app
  *    auto-connects and applies FCC on every launch.
@@ -151,7 +153,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
     // --- Connection ---
 
     /**
-     * Connects to the controller. Tries USB first (covers phone+RC-N1/RC-N2
+     * Connects to the controller. Tries USB first (covers phone+RC-N1/RC-N2/RC-N3
      * and direct-to-drone USB), then falls back to the TCP proxy (smart
      * controllers). This is the universal path the user asked for.
      */
@@ -176,11 +178,11 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
                 update {
                     copy(
                         status = "disconnected",
-                        message = "Controller not found. Plug in the RC via USB, or power on a smart controller.",
+                        message = "Controller not found. Connect your phone to the bottom USB port of the RC-N1/RC-N2/RC-N3.",
                         isConnected = false
                     )
                 }
-                log("Connection failed — no USB accessory and no TCP proxy at 127.0.0.1:40009")
+                log("Connection failed — no DJI RC-N1/RC-N2/RC-N3 USB serial device detected")
             }
         }
     }
@@ -189,20 +191,23 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
      * Tries USB first, then TCP. Returns true and sets [transport] on success.
      */
     private fun connectInternal(): Boolean {
-        // 1) USB accessory/device — phone cabled to RC-N1/RC-N2 or directly to drone
-        val usb = UsbTransport.openAttached(app)
+        // 1) USB serial — phone cabled to RC-N1/RC-N2/RC-N3 (the primary path)
+        val usb = UsbSerialTransport.open(app)
         if (usb != null) {
-            transport = usb
-            update {
-                copy(
-                    transportName = usb.name,
-                    transportKind = "USB"
-                )
+            if (usb.open()) {
+                transport = usb
+                update {
+                    copy(
+                        transportName = usb.name,
+                        transportKind = "USB"
+                    )
+                }
+                return true
             }
-            return true
+            usb.close()
         }
 
-        // 2) TCP proxy — smart controller running the app on-device
+        // 2) TCP proxy — smart controller running the app on-device (fallback)
         val tcp = TcpTransport()
         if (tcp.open()) {
             transport = tcp

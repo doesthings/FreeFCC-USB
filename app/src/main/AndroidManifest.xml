@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- USB host: talk to DJI RCs / drones that present a USB accessory/device interface.
-         This is the USB cable remote controller path. -->
-    <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
+    <!-- USB host: the RC-N1/RC-N2/RC-N3 enumerates as a USB CDC ACM serial device. -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
-    <!-- INTERNET is only declared for parity with the original apps; the app never uses it. -->
+    <!-- INTERNET is only declared for parity; the app never uses it. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
@@ -42,13 +40,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Launch the app automatically when a DJI RC is plugged in via USB -->
             <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
-            <meta-data
-                android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"
-                android:resource="@xml/usb_device_filter" />
             <meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_device_filter" />

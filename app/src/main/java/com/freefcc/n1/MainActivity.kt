@@ -180,8 +180,7 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
                 }
                 !state.isConnected -> {
                     BodyText(
-                        "Plug your phone into the RC via USB, or run this app on a smart controller. " +
-                        "Then tap Connect."
+                        "Connect your phone to the bottom USB port of the RC-N1/RC-N2/RC-N3, then tap Connect."
                     )
                     Spacer(Modifier.height(20.dp))
                     GlowButton("Connect", Cyan) { viewModel.connect() }
@@ -509,13 +508,13 @@ private fun InfoPage(state: AppState, viewModel: FccViewModel) {
             Spacer(Modifier.height(12.dp))
             BodyText(
                 if (state.transportKind == "USB")
-                    "USB accessory/device mode. App runs on your phone/tablet, cabled to the RC-N1/RC-N2 " +
-                    "or directly to the drone's USB-C port. This is the USB path."
+                    "USB connection to the RC-N1/RC-N2/RC-N3. App runs on your phone, " +
+                    "sending DUMPL commands over the USB cable to the controller."
                 else if (state.transportKind == "TCP")
-                    "TCP loopback at 127.0.0.1:40009. App runs ON the smart controller (RC2/RC Pro/RC Plus). " +
-                    "This is the smart-controller path."
+                    "TCP loopback at 127.0.0.1:40009. App is running on a smart controller " +
+                    "(RC2/RC Pro/RC Plus). For smart controllers, use FreeFCC instead."
                 else
-                    "No transport connected. Tap Connect on the FCC page.",
+                    "No transport connected. Plug your phone into the RC-N1/RC-N2/RC-N3 via USB, then tap Connect on the FCC page.",
                 TextGray
             )
         }
@@ -613,15 +612,13 @@ private fun AboutPage() {
         GlowCard {
             Text("FreeFCC-N1", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(6.dp))
-            Text("Universal FCC unlock for all DJI controllers", color = Cyan, fontSize = 13.sp)
+            Text("Open-source FCC unlock for DJI RC-N1 / RC-N2", color = Cyan, fontSize = 13.sp)
             Spacer(Modifier.height(16.dp))
             BodyText(
                 "A free and open-source Android app that unlocks FCC mode, enables 4G, " +
-                "controls LEDs, and queries device info on DJI controllers. Works on BOTH " +
-                "phone-cabled RCs (USB accessory mode — the USB path) AND smart " +
-                "controllers (TCP at 127.0.0.1:40009 — the smart-controller path). " +
-                "No server. No license. No tracking. Just raw DUMPL commands from JSON " +
-                "profile files.",
+                "controls LEDs, and queries device info on DJI controllers that connect " +
+                "via USB cable to your phone (RC-N1, RC-N2). No server. No license. " +
+                "No tracking. Just raw DUMPL commands from JSON profile files.",
                 TextGray
             )
         }
@@ -632,12 +629,10 @@ private fun AboutPage() {
             Text("How it works", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             BodyText(
-                "The app sends DUMPL commands to your DJI controller. DUMPL is DJI's " +
-                "internal command protocol. On smart controllers the proxy listens at " +
-                "127.0.0.1:40009; on phone+USB setups the same frames go through the USB " +
-                "bulk endpoint. Each command is a small binary packet with a magic byte " +
-                "(0x55), a header, a payload, and two CRC checksums. The app builds these " +
-                "packets from JSON profile files you can inspect and edit.",
+                "The app sends DUMPL commands to your DJI controller over the USB cable. " +
+                "DUMPL is DJI's internal command protocol. Each command is a small binary " +
+                "packet with a magic byte (0x55), a header, a payload, and two CRC checksums. " +
+                "The app builds these packets from JSON profile files you can inspect and edit.",
                 TextGray
             )
         }
@@ -647,14 +642,11 @@ private fun AboutPage() {
         GlowCard {
             Text("Supported", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            BodyText("All N1-class remotes + smart controllers:", Cyan.copy(0.8f))
+            BodyText("Controllers:", Cyan.copy(0.8f))
             Spacer(Modifier.height(8.dp))
             val supported = listOf(
-                "RC-N1 / RC-N2 (USB cabled to phone)",
-                "DJI RC 2 (smart controller, TCP)",
-                "DJI RC Pro / RC Pro 2 (smart controller, TCP)",
-                "DJI Smart Controller (smart controller, TCP)",
-                "DJI RC Plus (smart controller, TCP)",
+                "RC-N1 (USB cabled to phone)",
+                "RC-N2 (USB cabled to phone)",
                 "Direct USB-to-drone (USB-C, fallback)"
             )
             supported.forEach {
@@ -712,7 +704,7 @@ private fun AboutPage() {
             Spacer(Modifier.height(12.dp))
             InfoRow("Protocol", "DUMPL")
             Spacer(Modifier.height(12.dp))
-            InfoRow("Transports", "USB + TCP")
+            InfoRow("Transports", "USB (RC-N1/N2)")
             Spacer(Modifier.height(12.dp))
             InfoRow("Server", "None (fully offline)")
         }
