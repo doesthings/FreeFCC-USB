@@ -319,7 +319,7 @@ private fun AboutPage() {
         Spacer(Modifier.height(28.dp))
 
         GlowCard {
-            Text("FreeFCC-N1", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
+            Text("FreeFCC USB", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(6.dp))
             Text("Open-source FCC unlock for DJI RC-N1 / RC-N2 / RC-N3", color = Cyan, fontSize = 13.sp)
             Spacer(Modifier.height(16.dp))
@@ -447,7 +447,7 @@ private fun AppHeader(state: AppState) {
                     )
             )
             Text(
-                "FreeFCC-N1",
+                "FreeFCC USB",
                 color = Cyan.copy(alpha = glowAlpha),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
@@ -457,7 +457,7 @@ private fun AppHeader(state: AppState) {
         Spacer(Modifier.height(6.dp))
         Text(
             buildString {
-                append("v1.0")
+                append("v1.1")
                 if (state.transportKind.isNotEmpty()) append(" · ${state.transportKind}")
             },
             color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium

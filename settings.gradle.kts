@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FreeFCC-N1"
+rootProject.name = "FreeFCC-USB"
 include(":app")

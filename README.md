@@ -1,6 +1,6 @@
 <div align="center">
 
-# FreeFCC-N1
+# FreeFCC USB
 
 ### Open-source FCC unlock for DJI RC-N1 / RC-N2 / RC-N3 controllers
 
@@ -30,11 +30,11 @@ A free and open-source Android app that unlocks FCC mode on DJI drones when you'
 
 ## Support this project
 
-If FreeFCC-N1 helped you out, please consider buying me a coffee. It helps cover server costs and keeps development going.
+If FreeFCC USB helped you out, please consider buying me a coffee. It helps cover server costs and keeps development going.
 
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/freefcc)
 
-[![Star on GitHub](https://img.shields.io/badge/Star%20on%20GitHub-%E2%AD%90-yellow?style=for-the-badge&logo=github)](https://github.com/doesthings/FreeFCC-N1)
+[![Star on GitHub](https://img.shields.io/badge/Star%20on%20GitHub-%E2%AD%90-yellow?style=for-the-badge&logo=github)](https://github.com/doesthings/FreeFCC USB)
 
 </div>
 
@@ -42,7 +42,7 @@ If FreeFCC-N1 helped you out, please consider buying me a coffee. It helps cover
 
 > ## ⚠️ Untested on real hardware
 >
-> This app has **not been tested on a real drone yet**. The DUMPL frames and USB transport are based on reverse-engineering of the NLD FCC app (which works on the Mini 3) and the publicly documented [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) protocol. If you test it, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know the result.
+> This app has **not been tested on a real drone yet**. The DUMPL frames and USB transport are based on reverse-engineering of the NLD FCC app (which works on the Mini 3) and the publicly documented [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) protocol. If you test it, please [open an issue](https://github.com/doesthings/FreeFCC USB/issues) and let me know the result.
 
 ---
 
@@ -52,7 +52,7 @@ If you're flying a **Mini 3** (or any DJI drone) with the stock **RC-N1** contro
 
 This app switches the radio from CE to FCC mode over the USB cable between your phone and the RC-N1/RC-N2/RC-N3. The same method the paid apps use, but free and open source.
 
-> **For smart controllers** (RC2, RC Pro, RC Plus — the ones with a built-in screen) — use [FreeFCC](https://github.com/doesthings/FreeFCC) instead. That app runs directly on the controller and connects via TCP. This app (FreeFCC-N1) is specifically for the USB-cabled controllers without a screen.
+> **For smart controllers** (RC2, RC Pro, RC Plus — the ones with a built-in screen) — use [FreeFCC](https://github.com/doesthings/FreeFCC) instead. That app runs directly on the controller and connects via TCP. This app (FreeFCC USB) is specifically for the USB-cabled controllers without a screen.
 
 ## Why existing tools don't work on the Mini 3
 
@@ -64,7 +64,7 @@ There are **two reasons** it fails:
 
 M4TH1EU uses CDC ACM serial mode (the phone is the USB host, the RC is a serial device at 19200 baud). But the Mini 3's RC-N1 firmware only accepts DUMPL commands over **Android Open Accessory (AOA) mode** — where the RC is the USB host and the phone is the accessory. The paid NLD FCC app uses AOA mode, which is why it works on the Mini 3 while M4TH1EU doesn't.
 
-**FreeFCC-N1 uses AOA accessory mode** — the same transport as NLD FCC. The RC-N1 presents as a USB accessory with `manufacturer="DJI"`, the app calls `UsbManager.openAccessory()` to get a `ParcelFileDescriptor`, and reads/writes raw DUMPL bytes via `FileInputStream`/`FileOutputStream`.
+**FreeFCC USB uses AOA accessory mode** — the same transport as NLD FCC. The RC-N1 presents as a USB accessory with `manufacturer="DJI"`, the app calls `UsbManager.openAccessory()` to get a `ParcelFileDescriptor`, and reads/writes raw DUMPL bytes via `FileInputStream`/`FileOutputStream`.
 
 ### 2. Incomplete frame sequence (2 frames instead of 21)
 
@@ -72,7 +72,7 @@ M4TH1EU sends only **2 hardcoded byte arrays** — a fragment of the full FCC un
 
 The Mini 3's firmware requires the **full 21-frame sequence**: enter service mode → set region to FCC → write both band power limits → commit → exit service mode. Without the full handshake, the radio silently discards the writes.
 
-**FreeFCC-N1 sends the complete 21-frame universal profile** — the same sequence NLD FCC uses internally.
+**FreeFCC USB sends the complete 21-frame universal profile** — the same sequence NLD FCC uses internally.
 
 ## Features
 
@@ -110,7 +110,7 @@ The Mini 3's firmware requires the **full 21-frame sequence**: enter service mod
 | Avata / Avata 2 / FPV Racer / FPV Racer 2 / Flip / Neo / Neo 2 | ✅ |
 | Phantom 4 STD/ADV/PRO/PRO V2/MS / Inspire 2 / Spark | ✅ |
 
-If you test it on a model or firmware version not listed here, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know.
+If you test it on a model or firmware version not listed here, please [open an issue](https://github.com/doesthings/FreeFCC USB/issues) and let me know.
 
 ## Step-by-step tutorial
 
@@ -121,13 +121,13 @@ If you test it on a model or firmware version not listed here, please [open an i
 - An Android phone or tablet (Android 7.0+)
 - A USB-C cable
 - Your DJI drone with RC-N1, RC-N2, or RC-N3 controller
-- The FreeFCC-N1 app (download from [releases](https://github.com/doesthings/FreeFCC-N1/releases))
+- The FreeFCC USB app (download from [releases](https://github.com/doesthings/FreeFCC USB/releases))
 
 ### Step 1: Install the app
 
-1. Download the `FreeFCC-N1.apk` from the [releases page](https://github.com/doesthings/FreeFCC-N1/releases)
+1. Download the `FreeFCC USB.apk` from the [releases page](https://github.com/doesthings/FreeFCC USB/releases)
 2. Install it on your Android phone (you may need to enable "Install unknown apps" in your security settings)
-3. You should see the FreeFCC-N1 app icon in your app drawer
+3. You should see the FreeFCC USB app icon in your app drawer
 
 ### Step 2: Power on the drone and controller
 
@@ -143,9 +143,9 @@ If you test it on a model or firmware version not listed here, please [open an i
 
 > **Why the bottom port?** The bottom port is the service/diagnostic port. When you plug into it, the controller enters USB host mode and the phone becomes a USB accessory. This is the AOA (Android Open Accessory) connection that allows DUMPL commands to be sent. The top port is for normal flight with DJI Fly and uses a different USB mode.
 
-### Step 4: Open FreeFCC-N1 and connect
+### Step 4: Open FreeFCC USB and connect
 
-1. Open the FreeFCC-N1 app on your phone
+1. Open the FreeFCC USB app on your phone
 2. Tap the **Connect** button
 3. If prompted, grant USB permission (a dialog will appear asking for permission to access the USB accessory — tap "Allow")
 4. The connection status should change from "Disconnected" to "Connected" (green indicator)
@@ -200,19 +200,19 @@ If the signal graph shows FCC mode, you're done. Go fly and enjoy the extra rang
 |---------|----------|
 | "Controller not found" | Make sure you're plugged into the **bottom** USB port. Try a different USB-C cable. Make sure the controller is powered on and linked to the drone. |
 | "FCC apply failed" | The DUMPL writes failed. Make sure the drone is powered on. Try disconnecting and reconnecting the USB cable, then tap Connect again. |
-| "Patched but still in CE mode" | The transport or frame sequence may not be compatible with your firmware. Please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) with your drone model, controller model, and firmware version. |
-| USB permission dialog doesn't appear | Go to Settings → Apps → FreeFCC-N1 → Permissions and grant USB access manually. Or unplug and replug the USB cable. |
+| "Patched but still in CE mode" | The transport or frame sequence may not be compatible with your firmware. Please [open an issue](https://github.com/doesthings/FreeFCC USB/issues) with your drone model, controller model, and firmware version. |
+| USB permission dialog doesn't appear | Go to Settings → Apps → FreeFCC USB → Permissions and grant USB access manually. Or unplug and replug the USB cable. |
 | App doesn't launch when I plug in the RC | The `USB_ACCESSORY_ATTACHED` intent filter should auto-launch the app. If it doesn't, open it manually from your app drawer. |
 
 ---
 
 ## Support
 
-If FreeFCC-N1 helped you out, please consider starring the repo and buying me a coffee. It helps cover server costs and keeps development going.
+If FreeFCC USB helped you out, please consider starring the repo and buying me a coffee. It helps cover server costs and keeps development going.
 
 <div align="center">
 
-[![Star on GitHub](https://img.shields.io/badge/Star%20on%20GitHub-%E2%AD%90-yellow?style=for-the-badge&logo=github)](https://github.com/doesthings/FreeFCC-N1)
+[![Star on GitHub](https://img.shields.io/badge/Star%20on%20GitHub-%E2%AD%90-yellow?style=for-the-badge&logo=github)](https://github.com/doesthings/FreeFCC USB)
 
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/freefcc)
 
@@ -322,5 +322,5 @@ The DUMPL protocol implementation is based on the publicly documented [dji-firmw
 
 Questions, issues, or feedback? Reach out:
 
-- **GitHub Issues:** [github.com/doesthings/FreeFCC-N1/issues](https://github.com/doesthings/FreeFCC-N1/issues)
+- **GitHub Issues:** [github.com/doesthings/FreeFCC USB/issues](https://github.com/doesthings/FreeFCC USB/issues)
 - **Ko-fi:** [ko-fi.com/freefcc](https://ko-fi.com/freefcc)
