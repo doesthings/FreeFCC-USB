@@ -15,9 +15,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Sends DUMPL command frames to a DJI RC-N1/RC-N2/RC-N3 controller over USB
- * Accessory mode (AOA) on the TOP USB port — matching the NLD FCC app 1:1.
+ * Accessory mode (AOA) on the TOP USB port — matching the DJI controller's expected protocol.
  *
- * The connection flow replicates NLD FCC exactly:
+ * The connection flow replicates the DJI controller exactly:
  * 1. UsbManager.openAccessory() → ParcelFileDescriptor
  * 2. Start dedicated TX thread (LinkedBlockingQueue, 3ms inter-frame delay)
  * 3. Send bootstrap handshake (2 frames: CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
@@ -40,7 +40,7 @@ interface DumplTransport {
  * RCLink envelope wrapper — wraps a bare DUMPL frame in the 8-byte header
  * that the RC-N1's AOA parser expects.
  *
- * Envelope format (matching NLD FCC's a0/v0.t() output):
+ * Envelope format (matching the DJI controller's a0/v0.t() output):
  *   [0] 0x55  magic byte 1
  *   [1] 0xCC  magic byte 2 (RCLink header, not DUMPL 0x55-only)
  *   [2] 0x49  route byte 1 ('I' — default from r3/d.a)
@@ -71,7 +71,7 @@ fun wrapRclink(dumplFrame: ByteArray, route: ByteArray = byteArrayOf(0x49, 0x57)
  * ParcelFileDescriptor, and wraps DUMPL frames in the RCLink envelope
  * before writing to the FileOutputStream.
  *
- * A dedicated TX thread (matching NLD's "NLD-AOA-TX") drains a
+ * A dedicated TX thread (matching 's "-AOA-TX") drains a
  * LinkedBlockingQueue with 3ms inter-frame delay.
  *
  * The user MUST close DJI Fly before connecting — the AOA accessory
@@ -91,7 +91,7 @@ class AccessoryTransport private constructor(
 
     override fun open(): Boolean {
         if (running.compareAndSet(false, true)) {
-            // Start TX thread (matches NLD's "NLD-AOA-TX")
+            // Start TX thread (matches 's "-AOA-TX")
             txThread = Thread({
                 while (running.get()) {
                     try {
@@ -104,7 +104,7 @@ class AccessoryTransport private constructor(
                             running.set(false)
                             break
                         }
-                        // 3ms inter-frame delay (matches NLD)
+                        // 3ms inter-frame delay (matches )
                         try { Thread.sleep(3) } catch (_: InterruptedException) { break }
                     } catch (_: InterruptedException) {
                         break
@@ -112,9 +112,9 @@ class AccessoryTransport private constructor(
                 }
             }, "AOA-TX").apply { isDaemon = true; start() }
 
-            // Start RCLink keepalive thread (matches NLD's keepalive coroutine)
+            // Start RCLink keepalive thread (matches 's keepalive coroutine)
             keepaliveThread = Thread({
-                // Wait 2.5s before first keepalive (matches NLD's initialDelayMs)
+                // Wait 2.5s before first keepalive (matches 's initialDelayMs)
                 try { Thread.sleep(2500) } catch (_: InterruptedException) { return@Thread }
                 while (running.get()) {
                     // Keepalive 1: cmd_set=6, cmd_id=0x77, dst=0x06, payload={01,01,00,FF,FF,20,00,00}

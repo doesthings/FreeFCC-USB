@@ -32,7 +32,7 @@ data class AppState(
 /**
  * Manages all app state and business logic.
  *
- * Matches the NLD FCC app's connection flow 1:1:
+ * Matches the DJI controller's connection flow 1:1:
  * 1. Open AOA accessory on the TOP USB port
  * 2. Start dedicated TX thread with 3ms inter-frame delay
  * 3. Send bootstrap handshake (CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
@@ -106,7 +106,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /**
      * Opens the AOA accessory on the TOP port, starts the TX thread,
-     * and sends the bootstrap handshake — matching NLD FCC exactly.
+     * and sends the bootstrap handshake — matching the DJI controller exactly.
      */
     private fun connectInternal(): Boolean {
         val accessory = AccessoryTransport.open(app)
@@ -115,7 +115,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             transport = accessory
             update { copy(transportName = accessory.name, transportKind = "USB-AOA") }
 
-            // Send bootstrap handshake (matching NLD FCC's CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
+            // Send bootstrap handshake (matching the DJI controller's CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
             sendBootstrap()
             log("Bootstrap handshake sent")
             return true
@@ -124,7 +124,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Sends the 2-frame bootstrap handshake that NLD FCC sends immediately
+     * Sends the 2-frame bootstrap handshake that the DJI controller sends immediately
      * after opening the AOA accessory.
      *
      * Frame 1: CONN_BOOTSTRAP_3100 — dst=0x1F, payload={0x00,0x00,0x01}
