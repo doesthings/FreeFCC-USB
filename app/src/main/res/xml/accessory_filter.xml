@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USB accessory filter for DJI RC-N1/RC-N2/RC-N3 controllers.
+     DJI controllers present as USB accessories with manufacturer="DJI".
+     The model strings cover the known DJI controller models.
+     This matches DJI's own SDK accessory filter. -->
+<resources>
+    <usb-accessory manufacturer="DJI" model="T600" />
+    <usb-accessory manufacturer="DJI" model="com.dji.logiclink" />
+    <usb-accessory manufacturer="DJI" model="WM160" />
+    <usb-accessory manufacturer="DJI" model="AG410" />
+</resources>

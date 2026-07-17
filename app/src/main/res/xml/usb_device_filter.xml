@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- USB device filter for DJI RC-N1/RC-N2/RC-N3 controllers.
-     All DJI controllers use vendor ID 0x2CA3. The RC-N1 has product ID 0x1020;
-     RC-N2 and RC-N3 have different product IDs but the same vendor ID.
-     Matching by vendor ID alone covers all N-series "dumb" controllers. -->
-<resources>
-    <usb-device vendor-id="11427" />
-</resources>

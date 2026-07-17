@@ -51,8 +51,4 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    // USB serial library for CDC ACM communication with DJI RC-N1/RC-N2/RC-N3 controllers.
-    // The library auto-detects CDC ACM devices by USB interface class (not VID/PID),
-    // so it works with any N-series controller regardless of product ID.
-    implementation("com.github.mik3y:usb-serial-for-android:3.10.0")
 }
