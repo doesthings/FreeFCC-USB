@@ -36,12 +36,16 @@ data class AppState(
 /**
  * Manages all app state and business logic.
  *
- * 1. **USB Accessory mode (AOA) for RC-N1/RC-N2/RC-N3.** This app connects
- *    to the controller over the Android Open Accessory protocol. The RC is
- *    the USB host and the phone is the accessory. We call
- *    [UsbManager.openAccessory] to get a [ParcelFileDescriptor] and then
- *    read/write raw DUMPL bytes via [FileInputStream]/[FileOutputStream].
- *    This is the same transport method used by the NLD FCC app.
+ * 1. **Dual USB transport for RC-N1/RC-N2/RC-N3.** The RC-N1 exposes two
+ *    USB transports on two physical ports:
+ *      - BOTTOM port: CDC ACM serial (VID 0x2CA3 / PID 0x1020) — the
+ *        service port where M4TH1EU sends its FCC patch. DUMPL writes
+ *        are most reliable here. Handled by [UsbSerialTransport].
+ *      - TOP port: AOA accessory (manufacturer="DJI") — the pipe DJI Fly
+ *        uses for flight. Handled by [AccessoryTransport]. Used as a
+ *        fallback when the bottom port isn't present.
+ *    [connectInternal] tries the BOTTOM port first, then falls back to
+ *    the TOP port. Whichever connects first wins.
  *
  * 2. **No license, no server, no trial.** The FCC profile is a JSON asset.
  *    The app works offline from first launch, forever.
@@ -133,8 +137,10 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
     // --- Connection ---
 
     /**
-     * Connects to the controller. Tries USB serial first (covers phone+RC-N1/N2/N3),
-     * then falls back to TCP (smart controllers).
+     * Connects to the controller. Tries the CDC ACM **bottom** port first
+     * (the service port where DUMPL commands reliably work — same port
+     * M4TH1EU's DJI-FCC-HACK uses), then falls back to the AOA **top**
+     * port (the DJI Fly pipe). Whichever connects first wins.
      */
     fun connect() {
         update { copy(status = "connecting", message = "Connecting to controller...") }
@@ -154,25 +160,44 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
                 update {
                     copy(
                         status = "disconnected",
-                        message = "Controller not found. Connect your phone to the bottom USB port of the RC-N1/RC-N2/RC-N3.",
+                        message = "Controller not found. Try the BOTTOM USB port of the " +
+                            "RC-N1/RC-N2/RC-N3 first (the service port). If that doesn't " +
+                            "work, try the TOP port.",
                         isConnected = false
                     )
                 }
-                log("Connection failed — no DJI USB accessory detected")
+                log("Connection failed — no DJI CDC ACM serial or AOA accessory detected")
             }
         }
     }
 
     private fun connectInternal(): Boolean {
-        // USB Accessory mode (AOA) — the NLD FCC method
-        // The RC-N1/RC-N2/RC-N3 presents as a USB accessory with manufacturer="DJI"
+        // 1) BOTTOM port — CDC ACM serial (VID 0x2CA3 / PID 0x1020).
+        //    This is the service port where M4TH1EU sends its FCC patch and
+        //    where DUMPL commands are most reliably accepted. Try first.
+        val serial = UsbSerialTransport.open(app)
+        if (serial != null) {
+            transport = serial
+            log("Connected via CDC ACM serial (bottom port)")
+            update {
+                copy(
+                    transportName = serial.name,
+                    transportKind = "USB-CDC"
+                )
+            }
+            return true
+        }
+
+        // 2) TOP port — AOA accessory (manufacturer="DJI").
+        //    The DJI Fly pipe. Used as a fallback.
         val accessory = AccessoryTransport.open(app)
         if (accessory != null) {
             transport = accessory
+            log("Connected via AOA accessory (top port)")
             update {
                 copy(
                     transportName = accessory.name,
-                    transportKind = "USB"
+                    transportKind = "USB-AOA"
                 )
             }
             return true
