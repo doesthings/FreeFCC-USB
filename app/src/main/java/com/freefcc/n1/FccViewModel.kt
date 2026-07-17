@@ -36,10 +36,12 @@ data class AppState(
 /**
  * Manages all app state and business logic.
  *
- * 1. **USB serial for RC-N1/RC-N2/RC-N3.** This app connects to the controller
- *    over a CDC ACM serial link at 19200 baud through the USB cable between
- *    your phone and the RC. The controller enumerates as a CDC ACM device
- *    and the library auto-detects it by interface class.
+ * 1. **USB Accessory mode (AOA) for RC-N1/RC-N2/RC-N3.** This app connects
+ *    to the controller over the Android Open Accessory protocol. The RC is
+ *    the USB host and the phone is the accessory. We call
+ *    [UsbManager.openAccessory] to get a [ParcelFileDescriptor] and then
+ *    read/write raw DUMPL bytes via [FileInputStream]/[FileOutputStream].
+ *    This is the same transport method used by the NLD FCC app.
  *
  * 2. **No license, no server, no trial.** The FCC profile is a JSON asset.
  *    The app works offline from first launch, forever.
@@ -156,26 +158,24 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
                         isConnected = false
                     )
                 }
-                log("Connection failed — no DJI RC-N1/RC-N2/RC-N3 USB serial device detected")
+                log("Connection failed — no DJI USB accessory detected")
             }
         }
     }
 
     private fun connectInternal(): Boolean {
-        // 1) USB serial — phone cabled to RC-N1/RC-N2/RC-N3 (the primary path)
-        val usb = UsbSerialTransport.open(app)
-        if (usb != null) {
-            if (usb.open()) {
-                transport = usb
-                update {
-                    copy(
-                        transportName = usb.name,
-                        transportKind = "USB"
-                    )
-                }
-                return true
+        // USB Accessory mode (AOA) — the NLD FCC method
+        // The RC-N1/RC-N2/RC-N3 presents as a USB accessory with manufacturer="DJI"
+        val accessory = AccessoryTransport.open(app)
+        if (accessory != null) {
+            transport = accessory
+            update {
+                copy(
+                    transportName = accessory.name,
+                    transportKind = "USB"
+                )
             }
-            usb.close()
+            return true
         }
         return false
     }

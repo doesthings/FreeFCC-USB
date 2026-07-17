@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- USB host: the RC-N1/RC-N2/RC-N3 enumerates as a USB CDC ACM serial device. -->
-    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <!-- USB accessory mode: the RC-N1/RC-N2/RC-N3 is the USB host, the phone is the accessory.
+         DJI controllers use the Android Open Accessory (AOA) protocol. -->
+    <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -37,12 +38,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Launch the app automatically when a DJI RC is plugged in via USB -->
             <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
             </intent-filter>
             <meta-data
-                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-                android:resource="@xml/usb_device_filter" />
+                android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"
+                android:resource="@xml/accessory_filter" />
         </activity>
 
     </application>

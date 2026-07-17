@@ -1,149 +1,151 @@
 package com.freefcc.n1
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
-import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
-import com.hoho.android.usbserial.driver.UsbSerialPort
-import com.hoho.android.usbserial.driver.UsbSerialProber
+import android.os.Build
+import android.os.ParcelFileDescriptor
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 
 /**
- * Sends DUMPL command frames to a DJI RC-N1/RC-N2/RC-N3 controller over USB.
+ * Sends DUMPL command frames to a DJI RC-N1/RC-N2/RC-N3 controller over USB
+ * **Accessory mode (AOA)**.
  *
- * The N-series controllers ("dumb" controllers without a screen) connect to
- * your phone via USB and enumerate as CDC ACM serial devices at 19200 baud.
- * We open the serial port and write DUMPL frames as raw bytes — the controller
- * forwards them to the drone over the radio link.
+ * The N-series controllers ("dumb" controllers without a screen) use the
+ * Android Open Accessory protocol to communicate with the phone. The RC is
+ * the USB **host** and the phone is the USB **accessory**. The phone calls
+ * [UsbManager.openAccessory] which returns a [ParcelFileDescriptor], then
+ * reads/writes raw DUMPL bytes via [FileInputStream]/[FileOutputStream].
  *
- * This is the same transport method used by M4TH1EU's DJI-FCC-HACK and the
- * paid NLD FCC app: a USB CDC ACM serial connection, not Android's USB
- * accessory mode and not the TCP loopback used by smart-controller tools.
+ * This is the same transport method used by the NLD FCC app: a raw byte
+ * pipe over AOA, not CDC ACM serial. The RC-N1's bottom port presents as
+ * an AOA accessory (manufacturer="DJI") when the RC is in host role.
  *
- * The library auto-detects CDC ACM devices by USB interface class (not
- * VID/PID), so this works with the RC-N1, RC-N2, and RC-N3 without needing
- * to know their specific product IDs.
+ * The CDC ACM serial path (used by M4TH1EU's DJI-FCC-HACK) only works on
+ * older firmware. The Mini 3's firmware only accepts DUMPL commands over
+ * the AOA path, which is why M4TH1EU fails on the Mini 3.
  */
 interface DumplTransport {
 
-    /** Opens the transport. Returns true on success, false on any I/O failure. */
     fun open(): Boolean
-
-    /**
-     * Writes one frame and returns true if the bytes were accepted by the
-     * carrier.
-     */
     fun write(frame: ByteArray): Boolean
-
-    /**
-     * Reads up to [length] bytes into [buffer]. Returns the number of bytes
-     * read, 0 on timeout, -1 on error/EOF. Never blocks longer than [timeoutMs].
-     */
     fun read(buffer: ByteArray, length: Int, timeoutMs: Int): Int
-
-    /** Releases the carrier. Safe to call multiple times. */
     fun close()
-
-    /** Human-readable name for logging/UI. */
     val name: String
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// USB serial transport — for RC-N1 / RC-N2 / RC-N3 (phone cabled via USB)
+// USB Accessory (AOA) transport — the NLD FCC method
 // ════════════════════════════════════════════════════════════════════════
 
 /**
- * USB CDC ACM serial transport for DJI RC-N1 / RC-N2 / RC-N3 controllers.
+ * USB Accessory mode transport for DJI RC-N1/RC-N2/RC-N3 controllers.
  *
- * The controller enumerates as a CDC ACM serial device at 19200 baud.
- * We open the serial port and write DUMPL frames as raw bytes.
+ * The controller is the USB host; the phone is the accessory. We call
+ * [UsbManager.openAccessory] to get a [ParcelFileDescriptor], then wrap
+ * it in [FileInputStream] / [FileOutputStream] for raw byte I/O.
  *
- * The RC-N1 has two USB ports:
- *  - **Bottom port** (Type-C): the service/diagnostic serial console —
- *    this is where the FCC patch is sent. The phone connects here, the
- *    app writes the DUMPL frames, then the phone moves to the top port.
- *  - **Top port**: used for normal flight with DJI Fly (MTP/accessory mode).
+ * No serial framing, no baud rate — just a raw byte pipe. The same DUMPL
+ * frames (0x55 magic + header + payload + CRCs) go through as-is.
  *
- * This transport writes to whichever port the phone is currently cabled to.
- * The library auto-detects CDC ACM devices by interface class, so it works
- * with any N-series controller regardless of product ID.
+ * The RC-N1's bottom USB-C port presents as an AOA accessory with
+ * manufacturer="DJI". The phone connects to the bottom port, the app
+ * opens the accessory, sends the DUMPL frames, then the phone moves to
+ * the top port for normal flight with DJI Fly.
  */
-class UsbSerialTransport private constructor(
-    private val serialPort: UsbSerialPort,
+class AccessoryTransport private constructor(
+    private val inputStream: FileInputStream,
+    private val outputStream: FileOutputStream,
+    private val pfd: ParcelFileDescriptor,
     override val name: String
 ) : DumplTransport {
 
-    private var isOpen = false
-
-    override fun open(): Boolean {
-        return try {
-            if (!isOpen) {
-                serialPort.setParameters(19200, 8, 1, UsbSerialPort.PARITY_NONE)
-                isOpen = true
-            }
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
+    override fun open(): Boolean = true  // already opened in factory
 
     override fun write(frame: ByteArray): Boolean {
         return try {
-            serialPort.write(frame, 1000)
+            outputStream.write(frame)
+            outputStream.flush()
             true
-        } catch (_: Exception) {
+        } catch (_: IOException) {
             false
         }
     }
 
     override fun read(buffer: ByteArray, length: Int, timeoutMs: Int): Int {
         return try {
-            serialPort.read(buffer, timeoutMs)
-        } catch (_: Exception) {
+            // Accessory-mode reads block until data arrives or the FD closes.
+            // We approximate the timeout by reading available() bytes only.
+            val avail = inputStream.available()
+            if (avail <= 0) return 0
+            inputStream.read(buffer, 0, minOf(length, avail))
+        } catch (_: IOException) {
             -1
         }
     }
 
     override fun close() {
-        try {
-            if (isOpen) {
-                serialPort.close()
-                isOpen = false
-            }
-        } catch (_: Exception) {}
+        try { inputStream.close() } catch (_: IOException) {}
+        try { outputStream.close() } catch (_: IOException) {}
+        try { pfd.close() } catch (_: IOException) {}
     }
 
     companion object {
 
+        private const val ACTION_USB_PERMISSION = "com.freefcc.n1.USB_PERMISSION"
+
         /**
-         * Attempts to find and open a connected DJI RC-N1/RC-N2/RC-N3 controller.
-         * Returns null if no CDC ACM device is found or permission is missing.
+         * Attempts to find and open a connected DJI RC-N1/RC-N2/RC-N3 controller
+         * via USB Accessory mode. Returns null if no DJI accessory is found.
          *
-         * Uses the library's default prober, which auto-detects CDC ACM devices
-         * by USB interface class (class 0x02, subclass 0x02). This works with
-         * any N-series controller — no need to know the specific product ID.
+         * The caller must have USB permission — if not, this will request it
+         * via a PendingIntent and return null (the caller should retry after
+         * the permission broadcast is received).
          */
-        fun open(context: Context): UsbSerialTransport? {
+        fun open(context: Context): AccessoryTransport? {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
-            // The default prober auto-detects CDC ACM devices by interface class.
-            // Since v3.5.0, the library detects CDC/ACM by USB interface types
-            // instead of fixed VID+PID, so custom probers are not required.
-            val defaultProber = UsbSerialProber.getDefaultProber()
+            // Get the list of connected accessories (Android supports at most 1)
+            val accessories = usbManager.accessoryList
+            if (accessories.isNullOrEmpty()) return null
 
-            for (device in usbManager.deviceList.values) {
-                if (!usbManager.hasPermission(device)) continue
+            val accessory = accessories[0]
 
-                val driver = defaultProber.probeDevice(device) ?: continue
-                if (driver !is CdcAcmSerialDriver) continue
+            // DJI's runtime check: manufacturer must be "DJI"
+            if (accessory.manufacturer != "DJI") return null
 
-                val port = driver.ports.firstOrNull() ?: continue
-                return UsbSerialTransport(
-                    port,
-                    "USB Serial (VID=0x${device.vendorId.toString(16)}, PID=0x${device.productId.toString(16)})"
+            // Check permission
+            if (!usbManager.hasPermission(accessory)) {
+                // Request permission — the caller should retry after the broadcast
+                val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                    PendingIntent.FLAG_MUTABLE else 0
+                val pi = PendingIntent.getBroadcast(
+                    context, 0,
+                    Intent(ACTION_USB_PERMISSION).setPackage(context.packageName),
+                    flag
                 )
+                usbManager.requestPermission(accessory, pi)
+                return null
             }
 
-            return null
+            // Open the accessory — returns a ParcelFileDescriptor
+            val pfd = usbManager.openAccessory(accessory) ?: return null
+
+            val inputStream = FileInputStream(pfd.fileDescriptor)
+            val outputStream = FileOutputStream(pfd.fileDescriptor)
+
+            return AccessoryTransport(
+                inputStream,
+                outputStream,
+                pfd,
+                "USB Accessory: ${accessory.manufacturer}/${accessory.model}"
+            )
         }
     }
 }

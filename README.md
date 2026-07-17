@@ -42,9 +42,7 @@ If FreeFCC-N1 helped you out, please consider buying me a coffee. It helps cover
 
 > ## ⚠️ Untested on real hardware
 >
-> This app has **not been tested on a real drone yet**. The DUMPL frames are based on the publicly documented [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) protocol and loopback captures. The USB serial path for the RC-N1/RC-N2/RC-N3 has not been verified against a real drone.
->
-> If you test it, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know the result (success or failure, your drone model, controller, and firmware version).
+> This app has **not been tested on a real drone yet**. The DUMPL frames and USB transport are based on reverse-engineering of the NLD FCC app (which works on the Mini 3) and the publicly documented [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) protocol. If you test it, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know the result.
 
 ---
 
@@ -58,36 +56,23 @@ This app switches the radio from CE to FCC mode over the USB cable between your 
 
 ## Why existing tools don't work on the Mini 3
 
-The existing free FCC hack ([M4TH1EU/DJI-FCC-HACK](https://github.com/M4TH1EU/DJI-FCC-HACK)) **does not work on the Mini 3**. The author acknowledges this in the README: *"Many people reported that this hack doesn't work with the Mini 3."*
+The existing free FCC hack ([M4TH1EU/DJI-FCC-HACK](https://github.com/M4TH1EU/DJI-FCC-HACK)) **does not work on the Mini 3**. The author acknowledges this: *"Many people reported that this hack doesn't work with the Mini 3."*
 
-### The technical reason
+There are **two reasons** it fails:
 
-M4TH1EU's app sends only **2 hardcoded byte arrays** — a fragment of the full FCC unlock sequence. Specifically:
+### 1. Wrong USB transport (CDC ACM serial instead of AOA accessory mode)
 
-1. **Frame 1** is a `GENERAL` command with an empty payload that doesn't match any frame in the real FCC sequence.
-2. **Frame 2** is exactly **frame 9 of 21** from the universal FCC profile — it writes the 2.4GHz OFDM power limit. But it's missing the other 20 frames.
+M4TH1EU uses CDC ACM serial mode (the phone is the USB host, the RC is a serial device at 19200 baud). But the Mini 3's RC-N1 firmware only accepts DUMPL commands over **Android Open Accessory (AOA) mode** — where the RC is the USB host and the phone is the accessory. The paid NLD FCC app uses AOA mode, which is why it works on the Mini 3 while M4TH1EU doesn't.
 
-The problem: **the Mini 3's firmware requires the full 21-frame sequence.** Specifically, it requires:
+**FreeFCC-N1 uses AOA accessory mode** — the same transport as NLD FCC. The RC-N1 presents as a USB accessory with `manufacturer="DJI"`, the app calls `UsbManager.openAccessory()` to get a `ParcelFileDescriptor`, and reads/writes raw DUMPL bytes via `FileInputStream`/`FileOutputStream`.
 
-- **Service-mode entry** (frame 1) — without this, the radio silently discards all configuration writes
-- **Region set + commit** (frames 2 and 20) — the actual CE→FCC switch and its commit
-- **Both band power limits** (frames 9 and 10) — M4TH1EU only writes 2.4GHz, not 5.8GHz
-- **Service-mode exit** (frame 21) — to finalize the change
+### 2. Incomplete frame sequence (2 frames instead of 21)
 
-Older drones (Mavic Air 2, Mini 2, Air 2S) have permissive firmware that accepts a bare power-limit write without the service-mode handshake. The Mini 3's newer firmware enforces the full handshake, so M4TH1EU's 2 frames are silently ignored — the app says "Patched successfully" but the radio stays in CE.
+M4TH1EU sends only **2 hardcoded byte arrays** — a fragment of the full FCC unlock sequence. One is just frame 9 of 21 (the 2.4GHz power limit write). It's missing the service-mode handshake, the region commit, and the 5.8GHz power limit.
 
-### Why this app will work
+The Mini 3's firmware requires the **full 21-frame sequence**: enter service mode → set region to FCC → write both band power limits → commit → exit service mode. Without the full handshake, the radio silently discards the writes.
 
-FreeFCC-N1 sends the **complete 21-frame universal FCC profile** — the same sequence that the paid NLD FCC app (€25) uses internally. The sequence:
-
-1. Enters service mode
-2. Sets the radio region to FCC
-3. Writes flight-controller region parameters
-4. Sets both 2.4GHz and 5.8GHz channel groups and power limits
-5. Commits the region change
-6. Exits service mode
-
-Sent in 2 rounds with 150ms between each frame, giving the controller time to process each command. This is the complete handshake that the Mini 3's firmware requires.
+**FreeFCC-N1 sends the complete 21-frame universal profile** — the same sequence NLD FCC uses internally.
 
 ## Features
 
@@ -106,9 +91,9 @@ Sent in 2 rounds with 150ms between each frame, giving the controller time to pr
 
 | Controller | Transport | Status |
 |------------|-----------|--------|
-| **RC-N1** (cabled to phone) | USB serial (CDC ACM, 19200 baud) | Untested — should work |
-| **RC-N2** (cabled to phone) | USB serial (CDC ACM, 19200 baud) | Untested — should work |
-| **RC-N3** (cabled to phone) | USB serial (CDC ACM, 19200 baud) | Untested — should work |
+| **RC-N1** (cabled to phone) | USB Accessory (AOA) | Untested — should work |
+| **RC-N2** (cabled to phone) | USB Accessory (AOA) | Untested — should work |
+| **RC-N3** (cabled to phone) | USB Accessory (AOA) | Untested — should work |
 
 > For **smart controllers** (RC2, RC Pro, RC Plus — the ones with a screen), use [FreeFCC](https://github.com/doesthings/FreeFCC) instead.
 
@@ -127,27 +112,66 @@ Sent in 2 rounds with 150ms between each frame, giving the controller time to pr
 
 If you test it on a model or firmware version not listed here, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know.
 
-## How to Use
+## Step-by-step tutorial
 
 > **Important:** You need to repeat these steps every time you turn on the drone and/or remote. FCC mode is a RAM-only setting — it reverts to the factory region on power cycle.
 
-1. Turn on the drone and remote and wait a few seconds for them to connect
-2. Connect your phone to the **bottom USB port** of the remote
-3. Open FreeFCC-N1, tap **Connect** — the app detects the USB serial connection to the RC
-4. Tap **Enable FCC Mode** and wait for the green checkmark
-5. **Disconnect your phone from the bottom USB port** of the remote and connect it to the **top USB port**
-6. Open DJI Fly and enjoy your drone with FCC mode
+### What you need
 
-> The bottom USB port is the service/diagnostic serial console — that's where the FCC patch is sent. The top USB port is for normal flight with DJI Fly. They present different USB interfaces, so the patch can only be sent from the bottom port.
+- An Android phone or tablet (Android 7.0+)
+- A USB-C cable
+- Your DJI drone with RC-N1, RC-N2, or RC-N3 controller
+- The FreeFCC-N1 app (download from [releases](https://github.com/doesthings/FreeFCC-N1/releases))
 
-## How Do I Know If It Worked?
+### Step 1: Install the app
 
-Open the DJI Fly app and go to the Transmission tab. Look at the horizontal bar around -90 dBm:
+1. Download the `FreeFCC-N1.apk` from the [releases page](https://github.com/doesthings/FreeFCC-N1/releases)
+2. Install it on your Android phone (you may need to enable "Install unknown apps" in your security settings)
+3. You should see the FreeFCC-N1 app icon in your app drawer
 
-- If it lines up with the **1km mark**, your drone is in **CE mode**
-- If it falls **below** the 1km mark (extends further), your drone is in **FCC mode**
+### Step 2: Power on the drone and controller
 
-Check the images below for reference.
+1. Turn on the drone
+2. Turn on the RC-N1/RC-N2/RC-N3 controller
+3. Wait a few seconds for them to connect to each other (the controller's status LED should turn green)
+
+### Step 3: Connect to the bottom USB port
+
+1. Take your USB-C cable
+2. Connect one end to your phone
+3. Connect the other end to the **bottom USB-C port** of the controller (NOT the top port where you normally plug in for DJI Fly)
+
+> **Why the bottom port?** The bottom port is the service/diagnostic port. When you plug into it, the controller enters USB host mode and the phone becomes a USB accessory. This is the AOA (Android Open Accessory) connection that allows DUMPL commands to be sent. The top port is for normal flight with DJI Fly and uses a different USB mode.
+
+### Step 4: Open FreeFCC-N1 and connect
+
+1. Open the FreeFCC-N1 app on your phone
+2. Tap the **Connect** button
+3. If prompted, grant USB permission (a dialog will appear asking for permission to access the USB accessory — tap "Allow")
+4. The connection status should change from "Disconnected" to "Connected" (green indicator)
+
+> **If it says "Controller not found":** Make sure you're plugged into the **bottom** port, not the top. Also try unplugging and replugging the USB cable. The controller needs to be powered on and linked to the drone.
+
+### Step 5: Enable FCC mode
+
+1. Once connected, tap the **Enable FCC Mode** button
+2. Wait for the progress bar to complete (it sends 21 frames in 2 rounds — takes about 6 seconds)
+3. You should see a green checkmark and "FCC mode enabled" message
+
+### Step 6: Switch to the top USB port
+
+1. **Disconnect** the USB cable from the bottom port of the controller
+2. **Reconnect** the USB cable to the **top USB-C port** of the controller (the one in the phone clamp)
+3. Open DJI Fly — your phone should connect normally
+
+### Step 7: Verify FCC mode is active
+
+1. In DJI Fly, go to the **Transmission** tab (the satellite/signal icon)
+2. Look at the horizontal signal bar around -90 dBm:
+   - If it lines up with the **1km mark**, your drone is still in **CE mode** (it didn't work)
+   - If it falls **below** the 1km mark (the signal extends further), your drone is in **FCC mode** ✅
+
+Check the images below for reference:
 
 <table>
 <tr>
@@ -164,7 +188,21 @@ Check the images below for reference.
 </tr>
 </table>
 
-> If the signal graph hasn't changed, power cycle the controller and try again. Make sure the drone is powered on and linked before enabling FCC.
+### Step 8: Fly!
+
+If the signal graph shows FCC mode, you're done. Go fly and enjoy the extra range.
+
+> **To revert to CE mode:** Either tap "Stop FCC Mode" in the app (before switching to the top port), or simply power cycle the controller and drone — FCC mode is RAM-only and reverts to the factory region on reboot.
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "Controller not found" | Make sure you're plugged into the **bottom** USB port. Try a different USB-C cable. Make sure the controller is powered on and linked to the drone. |
+| "FCC apply failed" | The DUMPL writes failed. Make sure the drone is powered on. Try disconnecting and reconnecting the USB cable, then tap Connect again. |
+| "Patched but still in CE mode" | The transport or frame sequence may not be compatible with your firmware. Please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) with your drone model, controller model, and firmware version. |
+| USB permission dialog doesn't appear | Go to Settings → Apps → FreeFCC-N1 → Permissions and grant USB access manually. Or unplug and replug the USB cable. |
+| App doesn't launch when I plug in the RC | The `USB_ACCESSORY_ATTACHED` intent filter should auto-launch the app. If it doesn't, open it manually from your app drawer. |
 
 ---
 
@@ -186,11 +224,17 @@ Every contribution helps cover server costs and keeps development going. Thank y
 
 ## How It Works
 
-The app sends DUMPL commands to the controller over the USB cable. DUMPL is DJI's internal command protocol, publicly documented in the [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) project.
+The app sends DUMPL commands to the controller over the USB cable using **Android Open Accessory (AOA) mode**. DUMPL is DJI's internal command protocol, publicly documented in the [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) project.
 
-The RC-N1/RC-N2/RC-N3 enumerates as a USB CDC ACM serial device at 19200 baud. The app opens the serial port using the [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) library and writes DUMPL frames as raw bytes — the controller forwards them to the drone over the radio link.
+### USB Accessory Mode (AOA) — the correct transport
 
-Each command is a small binary packet with a magic byte (`0x55`), a header with sender and receiver info, a payload, and two CRC checksums. The app builds these packets from a JSON profile file and sends them through the USB serial port.
+The RC-N1/RC-N2/RC-N3 uses the Android Open Accessory protocol to communicate with the phone. In this mode:
+- The **controller is the USB host** (it initiates the AOA handshake)
+- The **phone is the USB accessory** (it enters accessory mode)
+- The app calls `UsbManager.openAccessory()` to get a `ParcelFileDescriptor`
+- Raw DUMPL bytes are written via `FileOutputStream` and read via `FileInputStream`
+
+This is the same transport used by the NLD FCC app (the paid app that works on the Mini 3). The alternative CDC ACM serial mode (used by M4TH1EU's DJI-FCC-HACK) does not work on the Mini 3 because the newer firmware only accepts DUMPL commands over the AOA path.
 
 ### FCC Profile
 
@@ -212,7 +256,7 @@ The same 21 frames work on every DJI aircraft model — the profile is universal
 
 ### Profile Format
 
-The profile is a JSON file in `app/src/main/assets/profiles/fcc.json`. Each frame looks like this:
+The profile is a JSON file in `app/src/main/assets/profiles/fcc.json`. Each frame:
 
 ```json
 { "s": 16, "i": 88, "d": 18, "p": "030100", "note": "Enter service mode" }
@@ -238,8 +282,6 @@ tcpdump -i lo -w /sdcard/capture.pcap port 40009
 
 The frames are plaintext on the local socket with no encryption. Once captured, the payloads were decoded using the publicly documented command set and device type enums from the [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools) project (GPL-3.0). This project's `DumplBuilder` class implements the same CRC-8 (polynomial 0x8C, init 0x77) and CRC-16 (polynomial 0x1021 reflected, init 0x3692) as the reference implementation to build valid frames from the decoded command definitions.
 
-The USB serial transport uses the [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) library to open the CDC ACM serial port at 19200 baud. The library auto-detects CDC ACM devices by USB interface class, so it works with the RC-N1, RC-N2, and RC-N3 without needing to know their specific product IDs.
-
 ## Project Structure
 
 ```
@@ -249,7 +291,7 @@ app/src/main/
     ce_restore.json   1 frame, reset to factory region
   java/com/freefcc/n1/
     DumplBuilder.kt     Frame builder (CRC-8/16 tables)
-    DumplTransport.kt   DumplTransport interface + UsbSerialTransport
+    DumplTransport.kt   DumplTransport interface + AccessoryTransport (AOA)
     ProfileLoader.kt    JSON profile loader
     FccViewModel.kt     State management + business logic
     MainActivity.kt     Compose UI with animations
@@ -257,7 +299,7 @@ app/src/main/
     drawable/         Launcher icon (vector)
     mipmap-anydpi-v26/ Adaptive icon
     values/           Theme + strings
-    xml/              Network security config + USB device filter
+    xml/              Network security config + accessory filter
 ```
 
 ## Building
