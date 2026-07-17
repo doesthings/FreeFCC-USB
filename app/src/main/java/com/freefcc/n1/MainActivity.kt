@@ -157,7 +157,7 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
-            .padding(bottom = BottomNavHeight + 32.dp),
+            .padding(top = BottomNavHeight + 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(56.dp))
@@ -176,7 +176,7 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
                 }
                 !state.isConnected -> {
                     BodyText(
-                        "Plug your phone into the BOTTOM USB port of the " +
+                        "Close DJI Fly, then connect your phone to the TOP USB port of the " +
                         "RC-N1/RC-N2/RC-N3 (the service port), then tap Connect. " +
                         "If that doesn't work, try the TOP port."
                     )
@@ -246,7 +246,7 @@ private fun LogPage(state: AppState) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
-            .padding(bottom = BottomNavHeight + 32.dp),
+            .padding(top = BottomNavHeight + 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(56.dp))
@@ -313,7 +313,7 @@ private fun AboutPage() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
-            .padding(bottom = BottomNavHeight + 32.dp),
+            .padding(top = BottomNavHeight + 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(56.dp))
@@ -413,7 +413,7 @@ private fun AboutPage() {
             Spacer(Modifier.height(12.dp))
             InfoRow("Protocol", "DUMPL")
             Spacer(Modifier.height(12.dp))
-            InfoRow("Transport", "USB serial (CDC ACM)")
+            InfoRow("Transport", "USB Accessory (AOA)")
             Spacer(Modifier.height(12.dp))
             InfoRow("Server", "None (fully offline)")
         }
