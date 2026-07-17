@@ -63,7 +63,6 @@ This app switches the radio from CE to FCC mode over the USB cable between your 
 | **FCC Unlock** | Switches the radio from CE to FCC mode for higher power and more channels |
 | **4G Activation** | Enables 4G transmission on the aircraft (requires DJI Cellular Dongle 2) |
 | **Remote ID Toggle** | Disable or enable Remote ID broadcast |
-| **LED Control** | Turn aircraft arm LEDs on or off (requires DJI Fly running with aircraft connected) |
 | **Device Info** | Queries the controller for hardware and firmware version |
 | **Auto-FCC** | Toggle to automatically connect and apply FCC every time the app opens |
 | **Offline** | Everything runs locally. No internet, no server, no tracking |
@@ -85,27 +84,9 @@ This app switches the radio from CE to FCC mode over the USB cable between your 
 
 **The FCC profile is universal** — the same 21-frame DUMPL sequence works on every DJI aircraft:
 
-| Drone | Model code | FCC | 4G | Remote ID | LED |
+| Drone | Model code | FCC | 4G | Remote ID |
 |-------|-----------|-----|-----|-----------|-----|
-| **Mini 3** | wm163 | ✅ | N/A | ✅ | ✅ |
-| Mini 3 Pro | wm162 | ✅ | N/A | ✅ | ✅ |
-| Mini 4 Pro | wa140 | ✅ | N/A | ✅ | ✅ |
-| Mini 4K | — | ✅ | N/A | ✅ | ✅ |
-| Mini 5 Pro | wa150 | ✅ | N/A | ✅ | ✅ |
-| Mini 2 / Mini 2 SE | wm161 | ✅ | N/A | ✅ | ✅ |
-| Mini (Mavic Mini) | wm160 | ✅ | N/A | ✅ | ✅ |
-| Air 3 / Air 3S | wa233/wa234 | ✅ | ? | ✅ | ✅ |
-| Mavic Air / Air 2 / Air 2S | — | ✅ | ? | ✅ | ✅ |
-| Mavic 3 / Classic / Pro | wm260+ | ✅ | ? | ✅ | ✅ |
-| Mavic 4 Pro | wa341 | ✅ | ✅ | ✅ | ✅ |
-| Mavic Pro series / Mavic 2 Pro/Zoom | — | ✅ | ? | ✅ | ✅ |
-| Avata / Avata 2 | wm169/wa520 | ✅ | ? | ✅ | ✅ |
-| FPV Racer / FPV Racer 2 | — | ✅ | N/A | ✅ | ✅ |
-| Flip / Neo / Neo 2 | various | ✅ | N/A | ✅ | ✅ |
-| Phantom 4 STD / ADV / PRO / PRO V2 / MS | — | ✅ | N/A | ✅ | ✅ |
-| Inspire 2 | — | ✅ | N/A | ✅ | ✅ |
-| Spark | — | ✅ | N/A | ✅ | ✅ |
-
+| **Mini 3** | wm163 | ✅ | N/A | ✅ |\n| Mini 3 Pro | wm162 | ✅ | N/A | ✅ |\n| Mini 4 Pro | wa140 | ✅ | N/A | ✅ |\n| Mini 4K | — | ✅ | N/A | ✅ |\n| Mini 5 Pro | wa150 | ✅ | N/A | ✅ |\n| Mini 2 / Mini 2 SE | wm161 | ✅ | N/A | ✅ |\n| Mini (Mavic Mini) | wm160 | ✅ | N/A | ✅ |\n| Air 3 / Air 3S | wa233/wa234 | ✅ | ? | ✅ |\n| Mavic Air / Air 2 / Air 2S | — | ✅ | ? | ✅ |\n| Mavic 3 / Classic / Pro | wm260+ | ✅ | ? | ✅ |\n| Mavic 4 Pro | wa341 | ✅ | ✅ | ✅ |\n| Mavic Pro series / Mavic 2 Pro/Zoom | — | ✅ | ? | ✅ |\n| Avata / Avata 2 | wm169/wa520 | ✅ | ? | ✅ |\n| FPV Racer / FPV Racer 2 | — | ✅ | N/A | ✅ |\n| Flip / Neo / Neo 2 | various | ✅ | N/A | ✅ |\n| Phantom 4 STD / ADV / PRO / PRO V2 / MS | — | ✅ | N/A | ✅ |\n| Inspire 2 | — | ✅ | N/A | ✅ |\n| Spark | — | ✅ | N/A | ✅ |\n
 If you test it on a model or firmware version not listed here, please [open an issue](https://github.com/doesthings/FreeFCC-N1/issues) and let me know.
 
 ## How to Use
@@ -140,7 +121,6 @@ Some drones, DJI Fly versions, or firmware versions may reset back to CE Mode wh
 
 - **4G**: tap **Turn 4G ON** (the drone needs to be connected so the app can read its serial number). Requires DJI Cellular Dongle 2. Mini series does not support 4G.
 - **Remote ID**: tap **Disable RID** or **Enable RID** to toggle Remote ID broadcast.
-- **LED**: tap **LED ON** / **LED OFF** (requires DJI Fly running with aircraft connected).
 - **Info**: tap the refresh button on the Info page to query the controller's hardware and firmware version.
 
 ## How Do I Know If It Worked?
@@ -250,8 +230,6 @@ app/src/main/
     remote_id_off.json  1 frame, disable Remote ID
     remote_id_on.json   1 frame, re-enable Remote ID
     device_info.json 1 frame, version inquiry
-    led_on.json       1 frame, LED on (wrapped, port 40007)
-    led_off.json      1 frame, LED off (wrapped, port 40007)
   java/com/freefcc/n1/
     DumplBuilder.kt     Frame builder (CRC-8/16 tables)
     DumplTransport.kt   DumplTransport interface + UsbSerialTransport + TcpTransport

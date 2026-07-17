@@ -38,8 +38,6 @@ data class AppState(
     val deviceInfo: String = "",
     val isQueryingInfo: Boolean = false,
     val autoFcc: Boolean = false,
-    val isLedBusy: Boolean = false,
-    val ledStatus: String = "",
     val remoteIdDisabled: Boolean = false,
     val isRidBusy: Boolean = false,
     val logMessages: List<String> = emptyList()
@@ -398,36 +396,6 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             } else {
                 update { copy(isRidBusy = false, message = "Remote ID enable failed — RC link unreachable") }
                 log("Remote ID enable failed")
-            }
-        }
-    }
-
-    // --- LED ---
-
-    fun setLed(on: Boolean) {
-        if (!isControllerReachable()) return
-        update { copy(isLedBusy = true, ledStatus = if (on) "Turning LEDs on..." else "Turning LEDs off...") }
-        log(if (on) "Turning LEDs on..." else "Turning LEDs off...")
-
-        runOnIO {
-            val t = transport ?: return@runOnIO
-            val fileName = if (on) "led_on.json" else "led_off.json"
-            val profile = ProfileLoader.load(app, fileName)
-            log("Loaded LED profile: ${profile.frames.size} frames")
-
-            var anySuccess = false
-            // Send twice with a delay for reliability (matches FreeFCC behaviour)
-            for (attempt in 0 until 2) {
-                if (attempt > 0) delay(500)
-                if (sendProfile(t, profile)) anySuccess = true
-            }
-
-            if (anySuccess) {
-                update { copy(isLedBusy = false, ledStatus = if (on) "ON" else "OFF") }
-                log(if (on) "LEDs turned on" else "LEDs turned off")
-            } else {
-                update { copy(isLedBusy = false, ledStatus = "Failed — is DJI Fly running?") }
-                log("LED command failed")
             }
         }
     }

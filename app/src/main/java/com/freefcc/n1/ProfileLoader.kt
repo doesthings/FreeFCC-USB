@@ -13,8 +13,7 @@ import org.json.JSONObject
  *
  * This is the same design as FreeFCC's `Profiles.kt` — every byte that goes
  * on the wire is visible in a text file you can open in any editor. The only
- * difference here is the addition of the Remote ID profiles and the explicit
- * `port` / `wrapper` fields for the LED frames.
+ * difference here is the addition of the Remote ID profiles.
  *
  * Why no server: the FCC profile is a fixed 21-frame DUMPL command sequence
  * that works across DJI's modern controller fleet (verified across 11 model
@@ -34,7 +33,7 @@ object ProfileLoader {
      * @property interRoundDelay  Delay between rounds (ms)
      * @property readWindowMs  How long to wait for an ACK after each write
      * @property needsResponse  True if this command expects a response payload (device info)
-     * @property port          TCP port on smart controllers (40009 default, 40007 for LED)
+     * @property port          TCP port on smart controllers (40009 default)
      * @property frames        List of wire-ready frames (built from the JSON definition)
      */
     data class Profile(
@@ -49,7 +48,7 @@ object ProfileLoader {
         val frames: List<ByteArray>
     )
 
-    /** Loads a static profile (FCC, CE restore, LED, device info, Remote ID) from a JSON asset. */
+    /** Loads a static profile (FCC, CE restore, device info, Remote ID) from a JSON asset. */
     fun load(context: Context, fileName: String): Profile {
         val json = readAsset(context, "profiles/$fileName")
         val obj = JSONObject(json)
@@ -62,7 +61,6 @@ object ProfileLoader {
         val readWindow = obj.optInt("read_window_ms", 80)
         val needsResponse = obj.optBoolean("needs_response", false)
         val port = obj.optInt("port", 40009)
-        val useWrapper = obj.optBoolean("wrapper", false)
 
         val framesArray = obj.getJSONArray("frames")
         val builder = DumplBuilder()
@@ -78,7 +76,7 @@ object ProfileLoader {
                     payload = hexToBytes(f.optString("p", ""))
                 )
             )
-            if (useWrapper) wrapFrame(inner) else inner
+            inner
         }
 
         return Profile(
@@ -162,26 +160,5 @@ object ProfileLoader {
         return ByteArray(clean.length / 2) { i ->
             clean.substring(i * 2, i * 2 + 2).toInt(16).toByte()
         }
-    }
-
-    /**
-     * Wraps an inner DUMPL frame with the 8-byte outer header used by LED
-     * control on smart controllers (port 40007).
-     *
-     * Format: [0x55][0xCC][0x30][0x75][4-byte LE length][inner frame]
-     */
-    private fun wrapFrame(inner: ByteArray): ByteArray {
-        val out = ByteArray(8 + inner.size)
-        out[0] = 0x55
-        out[1] = 0xCC.toByte()
-        out[2] = 0x30
-        out[3] = 0x75
-        val len = inner.size
-        out[4] = (len and 0xFF).toByte()
-        out[5] = ((len shr 8) and 0xFF).toByte()
-        out[6] = ((len shr 16) and 0xFF).toByte()
-        out[7] = ((len shr 24) and 0xFF).toByte()
-        System.arraycopy(inner, 0, out, 8, inner.size)
-        return out
     }
 }

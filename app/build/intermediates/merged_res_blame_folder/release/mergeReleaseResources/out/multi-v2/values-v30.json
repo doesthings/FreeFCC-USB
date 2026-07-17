@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.freefcc.n1.app-mergeReleaseResources-41:/values-v30/values-v30.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\PC1\\.gradle\\caches\\8.10.2\\transforms\\b23928eed43b535dfc81b3611cae9f19\\transformed\\material3-release\\res\\values-v30\\values-v30.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "72",
+                        "endOffsets": "123"
+                    }
+                }
+            ]
+        }
+    ]
+}

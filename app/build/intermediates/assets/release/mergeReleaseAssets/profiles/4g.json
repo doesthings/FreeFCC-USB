@@ -1,0 +1,21 @@
+{
+  "name": "4G Activation",
+  "description": "Enables 4G/LTE transmission on the aircraft via the DJI Cellular Dongle 2. 128 frames with the aircraft serial number embedded in each payload. Sent in a single round with 10ms between frames. On smart controllers these frames go via Unix domain socket (/duss/mb/0x205); on phone+USB setups they go via the bulk endpoint with dst=OFDM_GROUND (238).",
+  "source": "Captured from loopback capture on a DJI smart controller for wa341 (Mavic 4 Pro). The frame format is documented in the DUMPL protocol — cmd_set=81 (0x51, 4G), cmd_id=0..127 (one per frame), dst=238 (OFDM_GROUND idx 7). NOTE: Mini 3 non-pro and Mini series do NOT support 4G — 4G is not supported on Mini series. 4G is enterprise-only (Mavic 4 Pro, Matrice series).",
+  "sender": 2,
+  "sender_desc": "CAMERA, index 0",
+  "cmd_type": 0,
+  "cmd_type_desc": "Request, NO_ACK_NEEDED, no encryption",
+  "rounds": 1,
+  "inter_frame_delay_ms": 10,
+  "inter_round_delay_ms": 0,
+  "read_window_ms": 80,
+  "frame_count": 128,
+  "cmd_set": 81,
+  "cmd_id_start": 0,
+  "dst": 238,
+  "dst_desc": "OFDM_GROUND, index 7",
+  "payload_prefix_hex": "000000",
+  "payload_serial_encoding": "ascii",
+  "note": "Each frame's payload is: 3 zero bytes + ASCII aircraft serial. Frame i has cmd_id=i (0..127). The serial is read from the controller at runtime via probeSerial(). Requires DJI Cellular Dongle 2 physically connected to the aircraft."
+}

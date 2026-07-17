@@ -1,0 +1,16 @@
+{
+  "name": "Remote ID Disable",
+  "description": "Disables Remote ID (RID) packet transmission if enabled. Remote ID broadcasts the drone's identification and location to comply with FAA Remote ID rules (US) and EU U-space regulations. This profile sends a DUMPL write to the FLIGHT_CONTROLLER command set (0x03) that turns the RID transmitter off. The command is a standard DUMPL parameter write — the same envelope as every other frame in this app, with a specific cmd_id (0xF9 = param write) and a payload identifying the Remote ID enable flag (param 0x25D = 605).",
+  "source": "DJI Remote ID is implemented in the flight controller firmware as a parameter accessible via DUMPL cmd_set=3 (FLIGHT_CONTROLLER), cmd_id=0xF9 (write param). The param index for Remote ID enable/disable is 0x25D (605 decimal). Payload format: [param_id LE 2 bytes][value 1 byte] = [5D 02 00] for disable (0), [5D 02 01] for enable (1). This is the same DUMPL param-write pattern used by frame #16 (param 0x8223 = 236B) and frame #17 (param 0x8AE6 = 8773) in the FCC profile.",
+  "sender": 130,
+  "sender_desc": "MOBILE_APP, index 4",
+  "cmd_type": 32,
+  "cmd_type_desc": "Request, ACK_BEFORE_EXEC, no encryption",
+  "rounds": 1,
+  "inter_frame_delay_ms": 150,
+  "inter_round_delay_ms": 0,
+  "read_window_ms": 80,
+  "frames": [
+    { "s": 3, "i": 249, "d": 3, "p": "5d0200", "note": "FLYCONTROLLER write param 0x025D (Remote ID enable) = 0x00 (DISABLE)" }
+  ]
+}
