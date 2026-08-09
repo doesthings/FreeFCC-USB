@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -184,13 +185,14 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
      */
     private fun applyFccInternal(): Boolean {
         val t = transport ?: return false
-        // USB AOA uses sender 0x02 (device 2, network 0).
-        // The FCC profile's default sender 0x82 (device 2, network 4) is for
-        // smart controllers with TCP proxy. The RC-N1/N2/N3 silently drops
-        // frames from the wrong network.
         val usbSender = 0x02
-        val profile = ProfileLoader.load(app, "fcc.json", senderOverride = usbSender)
-        log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds, sender=0x${"%02X".format(usbSender)}")
+        val profile = try {
+            ProfileLoader.load(app, "fcc.json", senderOverride = usbSender)
+        } catch (e: Exception) {
+            log("Failed to load FCC profile: ${e.message}")
+            return false
+        }
+        log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds")
 
         val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
 
@@ -205,8 +207,11 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
                     anySuccess = true
                 }
                 sent++
-                update { copy(busyProgress = sent.toFloat() / totalSends) }
-                try { Thread.sleep(5) } catch (_: Exception) {}
+                val progress = sent.toFloat() / totalSends
+                _state.update { it.copy(busyProgress = progress) }
+                if (profile.interFrameDelay > 0) {
+                    try { Thread.sleep(profile.interFrameDelay) } catch (_: Exception) {}
+                }
             }
             if (profile.interRoundDelay > 0) {
                 try { Thread.sleep(profile.interRoundDelay) } catch (_: Exception) {}
@@ -244,7 +249,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     private fun update(block: AppState.() -> AppState) {
-        _state.value = _state.value.block()
+        _state.update { it.block() }
     }
 
     private fun log(message: String) {
