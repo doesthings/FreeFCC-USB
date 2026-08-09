@@ -1,6 +1,5 @@
 *.iml
 .gradle
-/local.properties
 /.idea
 .DS_Store
 /build
@@ -9,5 +8,5 @@
 .cxx
 local.properties
 *.apk
-*.idsiglocal.properties
+*.idsig
 app/build/
