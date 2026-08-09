@@ -10,3 +10,4 @@ local.properties
 *.apk
 *.idsig
 app/build/
+AGENTS.md
