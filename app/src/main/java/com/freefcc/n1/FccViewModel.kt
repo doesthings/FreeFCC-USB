@@ -139,26 +139,10 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         val builder = DumplBuilder()
         val payload = byteArrayOf(0x00, 0x00, 0x01)
 
-        // Frame 1: CONN_BOOTSTRAP_3100 — dst component 0x1F (RC-N1 FCC/link service)
-        val frame1 = builder.buildFrame(DumplFrame(
-            sender = 0x02,    // mobile app (0200)
-            cmdType = 0x40,   // request expecting ACK
-            cmdSet = 0x00,
-            cmdId = 0x00,
-            dst = 0x1F,       // component 31 (3100)
-            payload = payload
-        ))
+        val frame1 = builder.buildFrame(DumplFrame(0x02, 0x40, 0x00, 0x00, 0x1F, payload))
         t.write(wrapRclink(frame1))
 
-        // Frame 2: CONN_BOOTSTRAP_0000 — dst component 0x00 (broadcast)
-        val frame2 = builder.buildFrame(DumplFrame(
-            sender = 0x02,
-            cmdType = 0x40,
-            cmdSet = 0x00,
-            cmdId = 0x00,
-            dst = 0x00,       // broadcast (0000)
-            payload = payload
-        ))
+        val frame2 = builder.buildFrame(DumplFrame(0x02, 0x40, 0x00, 0x00, 0x00, payload))
         t.write(wrapRclink(frame2))
     }
 
@@ -192,16 +176,17 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             log("Failed to load FCC profile: ${e.message}")
             return false
         }
-        log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds")
+        log("Loaded FCC profile: ${profile.frameDefs.size} frames, ${profile.rounds} rounds")
 
         val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
 
         var anySuccess = false
-        val totalSends = profile.frames.size * profile.rounds
+        val totalSends = profile.frameDefs.size * profile.rounds
         var sent = 0
 
         for (round in 0 until profile.rounds) {
-            for (frame in profile.frames) {
+            for (def in profile.frameDefs) {
+                val frame = ProfileLoader.buildFrame(def, profile.sender, profile.cmdType)
                 val wrapped = wrapRclink(frame, route)
                 if (t.write(wrapped)) {
                     anySuccess = true
@@ -229,7 +214,8 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             val profile = ProfileLoader.load(app, "ce_restore.json", senderOverride = 0x02)
             val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
             var anySuccess = false
-            for (frame in profile.frames) {
+            for (def in profile.frameDefs) {
+                val frame = ProfileLoader.buildFrame(def, profile.sender, profile.cmdType)
                 if (t.write(wrapRclink(frame, route))) anySuccess = true
             }
             if (anySuccess) {

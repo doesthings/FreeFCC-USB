@@ -89,7 +89,6 @@ class AccessoryTransport private constructor(
     private var txThread: Thread? = null
     private var rxThread: Thread? = null
     private var keepaliveThread: Thread? = null
-    private val keepaliveBuilder = DumplBuilder()
 
     @Volatile
     private var lastRoute: ByteArray = byteArrayOf(0x49, 0x57)
@@ -140,20 +139,20 @@ class AccessoryTransport private constructor(
                 }
             }, "AOA-TX").apply { isDaemon = true; start() }
 
-            // Start RCLink keepalive thread — uses shared builder to avoid
-            // sequence number collisions (each DumplBuilder starts at 149)
+            // Start RCLink keepalive thread — uses the global sequence counter
+            // so keepalive, bootstrap, and FCC frames never collide on seq numbers
             keepaliveThread = Thread({
+                val builder = DumplBuilder()
                 try { Thread.sleep(2500) } catch (_: InterruptedException) { return@Thread }
                 while (running.get()) {
                     val keepalivePayload = byteArrayOf(0x01, 0x01, 0x00, 0xFF.toByte(), 0xFF.toByte(), 0x20, 0x00, 0x00)
                     val route = lastRoute
-                    synchronized(keepaliveBuilder) {
-                        val ka1 = keepaliveBuilder.buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x06, keepalivePayload))
-                        try { queue.put(wrapRclink(ka1, route)) } catch (_: InterruptedException) { return@Thread }
+                    val ka1 = builder.buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x06, keepalivePayload))
+                    try { queue.put(wrapRclink(ka1, route)) } catch (_: InterruptedException) { break }
 
-                        val ka2 = keepaliveBuilder.buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x0E, keepalivePayload))
-                        try { queue.put(wrapRclink(ka2, route)) } catch (_: InterruptedException) { return@Thread }
-                    }
+                    val ka2 = builder.buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x0E, keepalivePayload))
+                    try { queue.put(wrapRclink(ka2, route)) } catch (_: InterruptedException) { break }
+
                     try { Thread.sleep(2500) } catch (_: InterruptedException) { break }
                 }
             }, "AOA-Keepalive").apply { isDaemon = true; start() }

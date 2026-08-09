@@ -52,47 +52,43 @@ data class DumplFrame(
  */
 class DumplBuilder {
 
-    private var sequenceNumber: Int = 149
-
-    /** Builds a single DUMPL frame as a byte array, ready to send over the wire. */
+    /** Builds a DUML frame with sequence number from the global counter. */
     fun buildFrame(frame: DumplFrame): ByteArray {
-        val payload = frame.payload
-        val totalLength = payload.size + 13 // 11 header + payload + 2 CRC
-
-        require(totalLength <= 1023) { "Frame too long: $totalLength bytes (max 1023)" }
-
-        val out = ByteArray(totalLength)
-
-        // Header — magic + 11-bit length + version (0x04 sets version=1 in bits 10-15)
-        out[0] = 0x55
-        out[1] = (totalLength and 0xFF).toByte()
-        out[2] = (((totalLength shr 8) and 0x03) or 0x04).toByte()
-        out[3] = crc8(out, 0, 3).toByte()
-
-        // Routing
-        out[4] = frame.sender.toByte()
-        out[5] = frame.dst.toByte()
-        out[6] = (sequenceNumber and 0xFF).toByte()
-        out[7] = ((sequenceNumber shr 8) and 0xFF).toByte()
-
-        // Command
-        out[8] = frame.cmdType.toByte()
-        out[9] = frame.cmdSet.toByte()
-        out[10] = frame.cmdId.toByte()
-
-        // Payload
-        System.arraycopy(payload, 0, out, 11, payload.size)
-
-        // CRC-16 over everything except the trailing 2 CRC bytes
-        val crc = crc16(out, 0, 11 + payload.size)
-        out[totalLength - 2] = (crc and 0xFF).toByte()
-        out[totalLength - 1] = ((crc shr 8) and 0xFF).toByte()
-
-        sequenceNumber = (sequenceNumber + 1) and 0xFFFF
-        return out
+        return buildFrameWithSeq(frame, ProfileLoader.globalSeq.getAndIncrement() and 0xFFFF)
     }
 
     companion object {
+        /** Builds a DUML frame with an explicit sequence number. */
+        fun buildFrameWithSeq(frame: DumplFrame, seq: Int): ByteArray {
+            val payload = frame.payload
+            val totalLength = payload.size + 13
+
+            require(totalLength <= 1023) { "Frame too long: $totalLength bytes (max 1023)" }
+
+            val out = ByteArray(totalLength)
+
+            out[0] = 0x55
+            out[1] = (totalLength and 0xFF).toByte()
+            out[2] = (((totalLength shr 8) and 0x03) or 0x04).toByte()
+            out[3] = crc8(out, 0, 3).toByte()
+
+            out[4] = frame.sender.toByte()
+            out[5] = frame.dst.toByte()
+            out[6] = (seq and 0xFF).toByte()
+            out[7] = ((seq shr 8) and 0xFF).toByte()
+
+            out[8] = frame.cmdType.toByte()
+            out[9] = frame.cmdSet.toByte()
+            out[10] = frame.cmdId.toByte()
+
+            System.arraycopy(payload, 0, out, 11, payload.size)
+
+            val crc = crc16(out, 0, 11 + payload.size)
+            out[totalLength - 2] = (crc and 0xFF).toByte()
+            out[totalLength - 1] = ((crc shr 8) and 0xFF).toByte()
+
+            return out
+        }
 
         // CRC-8 table — polynomial 0x8C (reflected of 0x140), 256 entries.
         // Matches the dji-firmware-tools reference implementation.

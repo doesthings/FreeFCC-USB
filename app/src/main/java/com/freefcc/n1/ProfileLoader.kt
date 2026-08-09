@@ -2,24 +2,26 @@ package com.freefcc.n1
 
 import android.content.Context
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Loads DUMPL command profiles from JSON files in `app/src/main/assets/profiles/`.
- *
- * Profiles are plain JSON — no encryption, no obfuscation, no server fetch.
- * Each file defines a sequence of DUMPL frames with timing parameters.
- * The app reads them at runtime, builds wire-format frames via [DumplBuilder],
- * and sends the raw bytes to the controller.
- *
- * Every byte that goes on the wire is visible in a text file you can open
- * in any editor.
- *
- * Why no server: the FCC profile is a fixed 21-frame DUMPL command sequence
- * that works across DJI's modern controller fleet. There is nothing
- * per-device or session-specific about FCC mode — it's a fixed DUMPL command
- * sequence. So we ship it as a JSON asset and never talk to a server.
  */
 object ProfileLoader {
+
+    /**
+     * Global sequence counter shared across all frame builders — bootstrap,
+     * keepalive, FCC, and CE restore all draw from this so no two frames
+     * in the same session ever carry the same sequence number.
+     */
+    val globalSeq = AtomicInteger(149)
+
+    data class FrameDef(
+        val cmdSet: Int,
+        val cmdId: Int,
+        val dst: Int,
+        val payload: ByteArray
+    )
 
     data class Profile(
         val sender: Int,
@@ -28,10 +30,9 @@ object ProfileLoader {
         val interFrameDelay: Long,
         val interRoundDelay: Long,
         val readWindowMs: Int,
-        val frames: List<ByteArray>
+        val frameDefs: List<FrameDef>
     )
 
-    /** Loads a profile (FCC or CE restore) from a JSON asset. */
     fun load(context: Context, fileName: String, senderOverride: Int? = null): Profile {
         val json = readAsset(context, "profiles/$fileName")
         val obj = JSONObject(json)
@@ -45,22 +46,25 @@ object ProfileLoader {
         val readWindow = obj.optInt("read_window_ms", 80)
 
         val framesArray = obj.getJSONArray("frames")
-        val builder = DumplBuilder()
-        val frames = (0 until framesArray.length()).map { i ->
+        val defs = (0 until framesArray.length()).map { i ->
             val f = framesArray.getJSONObject(i)
-            builder.buildFrame(
-                DumplFrame(
-                    sender = sender,
-                    cmdType = cmdType,
-                    cmdSet = f.getInt("s"),
-                    cmdId = f.getInt("i"),
-                    dst = f.getInt("d"),
-                    payload = hexToBytes(f.optString("p", ""))
-                )
+            FrameDef(
+                cmdSet = f.getInt("s"),
+                cmdId = f.getInt("i"),
+                dst = f.getInt("d"),
+                payload = hexToBytes(f.optString("p", ""))
             )
         }
 
-        return Profile(sender, cmdType, rounds, interFrame, interRound, readWindow, frames)
+        return Profile(sender, cmdType, rounds, interFrame, interRound, readWindow, defs)
+    }
+
+    /** Builds a wire-ready DUML frame from a definition, using the global sequence counter. */
+    fun buildFrame(def: FrameDef, sender: Int, cmdType: Int): ByteArray {
+        return DumplBuilder.buildFrameWithSeq(
+            DumplFrame(sender, cmdType, def.cmdSet, def.cmdId, def.dst, def.payload),
+            globalSeq.getAndIncrement() and 0xFFFF
+        )
     }
 
     private fun readAsset(context: Context, path: String): String =
@@ -69,6 +73,7 @@ object ProfileLoader {
     fun hexToBytes(hex: String): ByteArray {
         val clean = hex.replace(" ", "").replace("\n", "")
         if (clean.isEmpty()) return ByteArray(0)
+        require(clean.length % 2 == 0) { "Odd-length hex string" }
         return ByteArray(clean.length / 2) { i ->
             clean.substring(i * 2, i * 2 + 2).toInt(16).toByte()
         }
