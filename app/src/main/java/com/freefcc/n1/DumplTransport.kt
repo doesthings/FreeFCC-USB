@@ -4,6 +4,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.hardware.usb.UsbAccessory
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
+import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -200,13 +205,6 @@ class AccessoryTransport private constructor(
 
         private const val ACTION_USB_PERMISSION = "com.freefcc.n1.USB_PERMISSION"
 
-        /**
-         * Attempts to find and open a connected DJI RC-N1/RC-N2/RC-N3 controller
-         * via USB Accessory mode on the TOP port. Returns null if no DJI
-         * accessory is found.
-         *
-         * The user must close DJI Fly first — the AOA accessory is exclusive.
-         */
         fun open(context: Context): AccessoryTransport? {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
@@ -240,6 +238,162 @@ class AccessoryTransport private constructor(
                 pfd,
                 "USB Accessory: ${accessory.manufacturer}/${accessory.model}"
             )
+        }
+    }
+}
+
+/**
+ * USB VCOM (CDC-ACM bulk) transport for direct-to-drone connection.
+ *
+ * Used when DJI Fly resets FCC mode on startup — connect a second phone
+ * directly to the drone's USB-C port and send FCC commands there while
+ * DJI Fly stays connected via the RC. Raw DUML frames go directly to the
+ * drone without RCLink wrapping.
+ *
+ * DJI drone USB: vendor 0x2CA3 (11427), products in AOA range 0x2D00-0x2D05.
+ * Also detects any device with CDC-ACM or vendor-specific bulk endpoints.
+ */
+class VcomTransport private constructor(
+    private val connection: UsbDeviceConnection,
+    private val usbInterface: UsbInterface,
+    private val epOut: UsbEndpoint,
+    private val epIn: UsbEndpoint,
+    override val name: String
+) : DumplTransport {
+
+    private val running = AtomicBoolean(false)
+    private var rxThread: Thread? = null
+
+    override fun open(): Boolean {
+        if (running.compareAndSet(false, true)) {
+            rxThread = Thread({
+                val buf = ByteArray(512)
+                while (running.get()) {
+                    val n = connection.bulkTransfer(epIn, buf, buf.size, 1000)
+                    if (n < 0 && !running.get()) break
+                }
+            }, "VCOM-RX").apply { isDaemon = true; start() }
+        }
+        return true
+    }
+
+    override fun write(frame: ByteArray): Boolean {
+        if (!running.get()) return false
+        val n = connection.bulkTransfer(epOut, frame, frame.size, 1000)
+        return n == frame.size
+    }
+
+    override fun read(buffer: ByteArray, length: Int, timeoutMs: Int): Int {
+        return connection.bulkTransfer(epIn, buffer, length, timeoutMs)
+    }
+
+    override fun close() {
+        running.set(false)
+        try { rxThread?.interrupt() } catch (_: Exception) {}
+        try { connection.releaseInterface(usbInterface) } catch (_: Exception) {}
+        try { connection.close() } catch (_: Exception) {}
+    }
+
+    companion object {
+        private const val DJI_VENDOR_ID = 11427
+        private const val ACTION_USB_PERMISSION = "com.freefcc.n1.USB_PERMISSION_VCOM"
+
+        fun open(context: Context): VcomTransport? {
+            val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+
+            val device = findDjiDevice(usbManager) ?: return null
+
+            if (!usbManager.hasPermission(device)) {
+                val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                    PendingIntent.FLAG_MUTABLE else 0
+                val pi = PendingIntent.getBroadcast(
+                    context, 0,
+                    Intent(ACTION_USB_PERMISSION).setPackage(context.packageName),
+                    flag
+                )
+                usbManager.requestPermission(device, pi)
+                return null
+            }
+
+            val endpoints = findBulkEndpoints(device) ?: return null
+            val conn = usbManager.openDevice(device) ?: return null
+
+            if (!conn.claimInterface(endpoints.iface, true)) {
+                conn.close()
+                return null
+            }
+
+            // CDC-ACM line coding: 115200 baud, 8N1
+            val cdcIface = findCdcControlInterface(device)
+            if (cdcIface != null) {
+                conn.claimInterface(cdcIface, true)
+                val lineCoding = byteArrayOf(
+                    0x00, 0xC2.toByte(), 0x01, 0x00, // 115200 baud LE
+                    0x00, // 0 stop bits
+                    0x00, // no parity
+                    0x08  // 8 data bits
+                )
+                conn.controlTransfer(0x21, 0x20, 0, cdcIface.id, lineCoding, lineCoding.size, 1000)
+                conn.controlTransfer(0x21, 0x22, 3, cdcIface.id, null, 0, 1000)
+            }
+
+            return VcomTransport(
+                conn, endpoints.iface, endpoints.epOut, endpoints.epIn,
+                "USB VCOM: ${device.vendorId}/${device.productId}"
+            )
+        }
+
+        private fun findDjiDevice(usbManager: UsbManager): UsbDevice? {
+            for (device in usbManager.deviceList.values) {
+                if (device.vendorId == DJI_VENDOR_ID) return device
+                if (findBulkEndpoints(device) != null) return device
+            }
+            return null
+        }
+
+        private data class Endpoints(val iface: UsbInterface, val epOut: UsbEndpoint, val epIn: UsbEndpoint)
+
+        private fun findBulkEndpoints(device: UsbDevice): Endpoints? {
+            var bestScore = 0
+            var best: Endpoints? = null
+
+            for (i in 0 until device.interfaceCount) {
+                val iface = device.getInterface(i)
+                var epOut: UsbEndpoint? = null
+                var epIn: UsbEndpoint? = null
+                var score = 0
+
+                for (j in 0 until iface.endpointCount) {
+                    val ep = iface.getEndpoint(j)
+                    if (ep.type != UsbConstants.USB_ENDPOINT_XFER_BULK) continue
+                    if (ep.direction == UsbConstants.USB_DIR_OUT) epOut = ep
+                    else epIn = ep
+                }
+
+                if (epOut == null || epIn == null) continue
+
+                score += when (iface.interfaceClass) {
+                    0xFF -> 120   // vendor-specific
+                    0x0A -> 110   // CDC data
+                    else -> 10
+                }
+                if (epOut.maxPacketSize >= 512 && epIn.maxPacketSize >= 512) score += 50
+                if (iface.endpointCount == 2) score += 10
+
+                if (score > bestScore) {
+                    bestScore = score
+                    best = Endpoints(iface, epOut, epIn)
+                }
+            }
+            return best
+        }
+
+        private fun findCdcControlInterface(device: UsbDevice): UsbInterface? {
+            for (i in 0 until device.interfaceCount) {
+                val iface = device.getInterface(i)
+                if (iface.interfaceClass == 2 && iface.interfaceSubclass == 2) return iface
+            }
+            return null
         }
     }
 }

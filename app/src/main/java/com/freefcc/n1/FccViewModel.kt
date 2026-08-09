@@ -110,17 +110,29 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
      * and sends the bootstrap handshake — matching the DJI controller exactly.
      */
     private fun connectInternal(): Boolean {
+        // Try AOA first (phone plugged into RC's USB port)
         val accessory = AccessoryTransport.open(app)
         if (accessory != null) {
-            accessory.open() // starts TX thread + keepalive thread
+            accessory.open()
             transport = accessory
             update { copy(transportName = accessory.name, transportKind = "USB-AOA") }
-
-            // Send bootstrap handshake (matching the DJI controller's CONN_BOOTSTRAP_3100 + CONN_BOOTSTRAP_0000)
             sendBootstrap()
+            log("Connected via AOA (RC USB port)")
             log("Bootstrap handshake sent")
             return true
         }
+
+        // Try VCOM (phone plugged directly into drone's USB-C port)
+        val vcom = VcomTransport.open(app)
+        if (vcom != null) {
+            vcom.open()
+            transport = vcom
+            update { copy(transportName = vcom.name, transportKind = "USB-VCOM") }
+            log("Connected via VCOM (drone USB port)")
+            log("Direct-to-drone mode — FCC will persist while DJI Fly stays connected via RC")
+            return true
+        }
+
         return false
     }
 
@@ -169,13 +181,17 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         val unlock = DumplBuilder().buildFrame(
             DumplFrame(0x02, 0x40, 0x03, 0xDF, 0x03, byteArrayOf(0x01, 0x00, 0x00, 0x00))
         )
-        t.write(wrapRclink(unlock, route))
+        val toSend = if (t is VcomTransport) unlock else wrapRclink(unlock, route)
+        t.write(toSend)
         try { Thread.sleep(350) } catch (_: Exception) {}
     }
 
     private fun applyFccInternal(): Boolean {
         val t = transport ?: return false
+        val isVcom = t is VcomTransport
+        // VCOM sends raw DUML frames; AOA wraps them in RCLink envelope
         val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
+        // VCOM uses sender 0x02 (network 0); AOA also uses 0x02
         val usbSender = 0x02
         val profile = try {
             ProfileLoader.load(app, "fcc.json", senderOverride = usbSender)
@@ -183,7 +199,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             log("Failed to load FCC profile: ${e.message}")
             return false
         }
-        log("Sending ${profile.frameDefs.size} FCC frames, ${profile.rounds} rounds")
+        log("Sending ${profile.frameDefs.size} FCC frames, ${profile.rounds} rounds (${if (isVcom) "VCOM direct" else "AOA via RC"})")
 
         var anySuccess = false
         val totalSends = profile.frameDefs.size * profile.rounds
@@ -191,18 +207,17 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
 
         for (round in 0 until profile.rounds) {
             for (def in profile.frameDefs) {
-                // AssistantUnlock before every FC parameter write (cmdSet=3)
                 if (def.cmdSet == 3) {
                     sendAssistantUnlock(t, route)
                 }
                 val frame = ProfileLoader.buildFrame(def, profile.sender, profile.cmdType)
-                val wrapped = wrapRclink(frame, route)
-                if (t.write(wrapped)) {
+                // VCOM: raw DUML frame (no wrapper). AOA: RCLink envelope.
+                val toSend = if (isVcom) frame else wrapRclink(frame, route)
+                if (t.write(toSend)) {
                     anySuccess = true
                 }
                 sent++
-                val progress = sent.toFloat() / totalSends
-                _state.update { it.copy(busyProgress = progress) }
+                _state.update { it.copy(busyProgress = sent.toFloat() / totalSends) }
                 if (profile.interFrameDelay > 0) {
                     try { Thread.sleep(profile.interFrameDelay) } catch (_: Exception) {}
                 }
@@ -234,12 +249,14 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
                 if (!_state.value.isFccEnabled) break
 
                 // Re-send the FCC profile (1 round) with AssistantUnlock before each FC write
+                val isVcom = t is VcomTransport
                 for (def in profile.frameDefs) {
                     if (def.cmdSet == 3) {
                         sendAssistantUnlock(t, route)
                     }
                     val frame = ProfileLoader.buildFrame(def, profile.sender, profile.cmdType)
-                    t.write(wrapRclink(frame, route))
+                    val toSend = if (isVcom) frame else wrapRclink(frame, route)
+                    t.write(toSend)
                     try { Thread.sleep(profile.interFrameDelay) } catch (_: InterruptedException) { break }
                 }
             }
