@@ -32,11 +32,12 @@ object ProfileLoader {
     )
 
     /** Loads a profile (FCC or CE restore) from a JSON asset. */
-    fun load(context: Context, fileName: String): Profile {
+    fun load(context: Context, fileName: String, senderOverride: Int? = null): Profile {
         val json = readAsset(context, "profiles/$fileName")
         val obj = JSONObject(json)
 
-        val sender = obj.getInt("sender")
+        val profileSender = obj.getInt("sender")
+        val sender = senderOverride ?: profileSender
         val cmdType = obj.getInt("cmd_type")
         val rounds = obj.getInt("rounds")
         val interFrame = obj.optLong("inter_frame_delay_ms", 0)

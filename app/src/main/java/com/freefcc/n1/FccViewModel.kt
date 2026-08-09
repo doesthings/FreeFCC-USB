@@ -184,8 +184,13 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
      */
     private fun applyFccInternal(): Boolean {
         val t = transport ?: return false
-        val profile = ProfileLoader.load(app, "fcc.json")
-        log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds")
+        // USB AOA uses sender 0x02 (device 2, network 0).
+        // The FCC profile's default sender 0x82 (device 2, network 4) is for
+        // smart controllers with TCP proxy. The RC-N1/N2/N3 silently drops
+        // frames from the wrong network.
+        val usbSender = 0x02
+        val profile = ProfileLoader.load(app, "fcc.json", senderOverride = usbSender)
+        log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds, sender=0x${"%02X".format(usbSender)}")
 
         val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
 
@@ -216,7 +221,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         log("Restoring CE mode...")
         runOnIO {
             val t = transport ?: return@runOnIO
-            val profile = ProfileLoader.load(app, "ce_restore.json")
+            val profile = ProfileLoader.load(app, "ce_restore.json", senderOverride = 0x02)
             val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
             var anySuccess = false
             for (frame in profile.frames) {
