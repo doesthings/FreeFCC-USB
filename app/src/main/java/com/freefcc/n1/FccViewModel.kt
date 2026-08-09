@@ -146,6 +146,8 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         t.write(wrapRclink(frame2))
     }
 
+    private var fccRepeatThread: Thread? = null
+
     fun enableFcc() {
         if (!isControllerReachable()) return
         update { copy(status = "applying", isBusy = true, busyProgress = 0f, message = "Enabling FCC mode...") }
@@ -153,8 +155,9 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         runOnIO {
             val success = applyFccInternal()
             if (success) {
-                update { copy(status = "fcc_enabled", message = "FCC mode enabled", isFccEnabled = true, isBusy = false, busyProgress = 1f, isConnected = true) }
-                log("FCC mode enabled")
+                update { copy(status = "fcc_enabled", message = "FCC mode enabled — switch to DJI Fly now", isFccEnabled = true, isBusy = false, busyProgress = 1f, isConnected = true) }
+                log("FCC mode enabled — starting repeat service to maintain FCC")
+                startFccRepeat()
             } else {
                 update { copy(status = "connected", message = "FCC apply failed — is the drone on and linked?", isBusy = false, busyProgress = 0f) }
                 log("FCC apply failed — writes failed")
@@ -162,13 +165,17 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /**
-     * Sends the 21-frame FCC profile, each wrapped in the RCLink envelope.
-     * The TX thread handles the 3ms inter-frame delay and keepalives run
-     * in the background to keep the session alive.
-     */
+    private fun sendAssistantUnlock(t: DumplTransport, route: ByteArray) {
+        val unlock = DumplBuilder().buildFrame(
+            DumplFrame(0x02, 0x40, 0x03, 0xDF, 0x03, byteArrayOf(0x01, 0x00, 0x00, 0x00))
+        )
+        t.write(wrapRclink(unlock, route))
+        try { Thread.sleep(350) } catch (_: Exception) {}
+    }
+
     private fun applyFccInternal(): Boolean {
         val t = transport ?: return false
+        val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
         val usbSender = 0x02
         val profile = try {
             ProfileLoader.load(app, "fcc.json", senderOverride = usbSender)
@@ -176,9 +183,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
             log("Failed to load FCC profile: ${e.message}")
             return false
         }
-        log("Loaded FCC profile: ${profile.frameDefs.size} frames, ${profile.rounds} rounds")
-
-        val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
+        log("Sending ${profile.frameDefs.size} FCC frames, ${profile.rounds} rounds")
 
         var anySuccess = false
         val totalSends = profile.frameDefs.size * profile.rounds
@@ -186,6 +191,10 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
 
         for (round in 0 until profile.rounds) {
             for (def in profile.frameDefs) {
+                // AssistantUnlock before every FC parameter write (cmdSet=3)
+                if (def.cmdSet == 3) {
+                    sendAssistantUnlock(t, route)
+                }
                 val frame = ProfileLoader.buildFrame(def, profile.sender, profile.cmdType)
                 val wrapped = wrapRclink(frame, route)
                 if (t.write(wrapped)) {
@@ -205,8 +214,46 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         return anySuccess
     }
 
+    /**
+     * Continuously re-sends the FCC profile every 10 seconds to prevent
+     * DJI Fly from resetting the radio back to CE mode. DJI Fly resets
+     * FCC on every connection — the repeat service fights back.
+     */
+    private fun startFccRepeat() {
+        stopFccRepeat()
+        fccRepeatThread = Thread({
+            val t = transport ?: return@Thread
+            val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
+            val builder = DumplBuilder()
+            val profile = try {
+                ProfileLoader.load(app, "fcc.json", senderOverride = 0x02)
+            } catch (_: Exception) { return@Thread }
+
+            while (_state.value.isFccEnabled && transport != null) {
+                try { Thread.sleep(2_000) } catch (_: InterruptedException) { break }
+                if (!_state.value.isFccEnabled) break
+
+                // Re-send the FCC profile (1 round) with AssistantUnlock before each FC write
+                for (def in profile.frameDefs) {
+                    if (def.cmdSet == 3) {
+                        sendAssistantUnlock(t, route)
+                    }
+                    val frame = ProfileLoader.buildFrame(def, profile.sender, profile.cmdType)
+                    t.write(wrapRclink(frame, route))
+                    try { Thread.sleep(profile.interFrameDelay) } catch (_: InterruptedException) { break }
+                }
+            }
+        }, "FCC-Repeat").apply { isDaemon = true; start() }
+    }
+
+    private fun stopFccRepeat() {
+        fccRepeatThread?.interrupt()
+        fccRepeatThread = null
+    }
+
     fun disableFcc() {
         if (!isControllerReachable()) return
+        stopFccRepeat()
         update { copy(status = "restoring", isBusy = true, busyProgress = 0f, message = "Restoring CE mode...") }
         log("Restoring CE mode...")
         runOnIO {
