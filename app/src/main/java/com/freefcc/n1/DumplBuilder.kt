@@ -52,7 +52,7 @@ data class DumplFrame(
  */
 class DumplBuilder {
 
-    private var sequenceNumber: Int = 4096
+    private var sequenceNumber: Int = 149
 
     /** Builds a single DUMPL frame as a byte array, ready to send over the wire. */
     fun buildFrame(frame: DumplFrame): ByteArray {

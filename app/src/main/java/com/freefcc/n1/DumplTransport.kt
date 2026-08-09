@@ -87,15 +87,43 @@ class AccessoryTransport private constructor(
     private val queue = LinkedBlockingQueue<ByteArray>()
     private val running = AtomicBoolean(false)
     private var txThread: Thread? = null
+    private var rxThread: Thread? = null
     private var keepaliveThread: Thread? = null
+
+    @Volatile
+    private var lastRoute: ByteArray = byteArrayOf(0x49, 0x57)
 
     override fun open(): Boolean {
         if (running.compareAndSet(false, true)) {
-            // Start TX thread (matches 's "-AOA-TX")
+            // Start RX drain thread — continuously reads from the USB input
+            // stream to prevent the pipe from filling up and stalling writes.
+            // Also extracts route bytes from received RCLink envelopes so we
+            // can echo them back (NLD does this; the controller may change
+            // route mid-session).
+            rxThread = Thread({
+                val buf = ByteArray(4096)
+                while (running.get()) {
+                    try {
+                        val n = inputStream.read(buf)
+                        if (n < 0) {
+                            running.set(false)
+                            break
+                        }
+                        if (n >= 4 && buf[0] == 0x55.toByte() && buf[1] == 0xCC.toByte()) {
+                            lastRoute = byteArrayOf(buf[2], buf[3])
+                        }
+                    } catch (_: IOException) {
+                        running.set(false)
+                        break
+                    }
+                }
+            }, "AOA-RX").apply { isDaemon = true; start() }
+
+            // Start TX thread
             txThread = Thread({
                 while (running.get()) {
                     try {
-                        val frame = queue.take() // blocks until a frame is available
+                        val frame = queue.take()
                         if (frame.isEmpty()) continue
                         try {
                             outputStream.write(frame, 0, frame.size)
@@ -104,7 +132,6 @@ class AccessoryTransport private constructor(
                             running.set(false)
                             break
                         }
-                        // 3ms inter-frame delay (matches )
                         try { Thread.sleep(3) } catch (_: InterruptedException) { break }
                     } catch (_: InterruptedException) {
                         break
@@ -112,19 +139,17 @@ class AccessoryTransport private constructor(
                 }
             }, "AOA-TX").apply { isDaemon = true; start() }
 
-            // Start RCLink keepalive thread (matches 's keepalive coroutine)
+            // Start RCLink keepalive thread
             keepaliveThread = Thread({
-                // Wait 2.5s before first keepalive (matches 's initialDelayMs)
                 try { Thread.sleep(2500) } catch (_: InterruptedException) { return@Thread }
                 while (running.get()) {
-                    // Keepalive 1: cmd_set=6, cmd_id=0x77, dst=0x06, payload={01,01,00,FF,FF,20,00,00}
                     val keepalivePayload = byteArrayOf(0x01, 0x01, 0x00, 0xFF.toByte(), 0xFF.toByte(), 0x20, 0x00, 0x00)
+                    val route = lastRoute
                     val ka1 = DumplBuilder().buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x06, keepalivePayload))
-                    try { queue.put(wrapRclink(ka1)) } catch (_: InterruptedException) { break }
+                    try { queue.put(wrapRclink(ka1, route)) } catch (_: InterruptedException) { break }
 
-                    // Keepalive 2: same payload, dst=0x0E (1400)
                     val ka2 = DumplBuilder().buildFrame(DumplFrame(0x02, 0x40, 0x06, 0x77, 0x0E, keepalivePayload))
-                    try { queue.put(wrapRclink(ka2)) } catch (_: InterruptedException) { break }
+                    try { queue.put(wrapRclink(ka2, route)) } catch (_: InterruptedException) { break }
 
                     try { Thread.sleep(2500) } catch (_: InterruptedException) { break }
                 }
@@ -132,6 +157,9 @@ class AccessoryTransport private constructor(
         }
         return true
     }
+
+    /** Returns the last route bytes seen from the controller. */
+    fun currentRoute(): ByteArray = lastRoute.copyOf()
 
     /**
      * Enqueues a frame for writing. The frame should already be wrapped
@@ -159,6 +187,7 @@ class AccessoryTransport private constructor(
 
     override fun close() {
         running.set(false)
+        try { rxThread?.interrupt() } catch (_: Exception) {}
         try { txThread?.interrupt() } catch (_: Exception) {}
         try { keepaliveThread?.interrupt() } catch (_: Exception) {}
         try { inputStream.close() } catch (_: IOException) {}

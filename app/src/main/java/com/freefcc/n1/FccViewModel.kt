@@ -187,21 +187,20 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         val profile = ProfileLoader.load(app, "fcc.json")
         log("Loaded FCC profile: ${profile.frames.size} frames, ${profile.rounds} rounds")
 
+        val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
+
         var anySuccess = false
         val totalSends = profile.frames.size * profile.rounds
         var sent = 0
 
         for (round in 0 until profile.rounds) {
             for (frame in profile.frames) {
-                // Wrap each DUMPL frame in the RCLink envelope before sending
-                val wrapped = wrapRclink(frame)
+                val wrapped = wrapRclink(frame, route)
                 if (t.write(wrapped)) {
                     anySuccess = true
                 }
                 sent++
                 update { copy(busyProgress = sent.toFloat() / totalSends) }
-                // The TX thread handles the 3ms inter-frame delay internally.
-                // We add a small sleep here for the progress bar to update smoothly.
                 try { Thread.sleep(5) } catch (_: Exception) {}
             }
             if (profile.interRoundDelay > 0) {
@@ -218,9 +217,10 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         runOnIO {
             val t = transport ?: return@runOnIO
             val profile = ProfileLoader.load(app, "ce_restore.json")
+            val route = if (t is AccessoryTransport) t.currentRoute() else byteArrayOf(0x49, 0x57)
             var anySuccess = false
             for (frame in profile.frames) {
-                if (t.write(wrapRclink(frame))) anySuccess = true
+                if (t.write(wrapRclink(frame, route))) anySuccess = true
             }
             if (anySuccess) {
                 update { copy(status = "connected", message = "CE mode restored", isFccEnabled = false, isBusy = false) }

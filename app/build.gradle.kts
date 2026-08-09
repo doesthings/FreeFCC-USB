@@ -12,8 +12,20 @@ android {
         applicationId = "com.freefcc.n1"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
+    }
+
+    signingConfigs {
+        create("release") {
+            val sf = System.getenv("SIGNING_STORE_FILE")
+            if (sf != null) {
+                storeFile = file(sf)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -24,7 +36,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            val rc = signingConfigs.findByName("release")
+            signingConfig = if (rc?.storeFile != null) rc else signingConfigs.getByName("debug")
         }
     }
 

@@ -9,4 +9,5 @@
 .cxx
 local.properties
 *.apk
-*.idsig
+*.idsiglocal.properties
+app/build/
