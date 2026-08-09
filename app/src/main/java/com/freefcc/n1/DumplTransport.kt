@@ -71,8 +71,8 @@ fun wrapRclink(dumplFrame: ByteArray, route: ByteArray = byteArrayOf(0x49, 0x57)
  * ParcelFileDescriptor, and wraps DUMPL frames in the RCLink envelope
  * before writing to the FileOutputStream.
  *
- * A dedicated TX thread (matching 's "-AOA-TX") drains a
- * LinkedBlockingQueue with 3ms inter-frame delay.
+ * A dedicated TX thread drains a LinkedBlockingQueue with 3ms
+ * inter-frame delay.
  *
  * The user MUST close DJI Fly before connecting — the AOA accessory
  * is exclusive (only one app can hold it at a time).
@@ -98,8 +98,7 @@ class AccessoryTransport private constructor(
             // Start RX drain thread — continuously reads from the USB input
             // stream to prevent the pipe from filling up and stalling writes.
             // Also extracts route bytes from received RCLink envelopes so we
-            // can echo them back (NLD does this; the controller may change
-            // route mid-session).
+            // can echo them back (the controller may change route mid-session).
             rxThread = Thread({
                 val buf = ByteArray(4096)
                 while (running.get()) {
