@@ -113,6 +113,7 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         // Try AOA first (phone plugged into RC's USB port)
         val accessory = AccessoryTransport.open(app)
         if (accessory != null) {
+            accessory.rxListener = { frame -> logRxFrame(frame) }
             accessory.open()
             transport = accessory
             update { copy(transportName = accessory.name, transportKind = "USB-AOA") }
@@ -296,6 +297,32 @@ class FccViewModel(private val app: Application) : AndroidViewModel(app) {
         if (_state.value.isConnected && transport != null) return true
         log("Connect to the controller first")
         return false
+    }
+
+    private fun logRxFrame(raw: ByteArray) {
+        // Parse RCLink envelope or raw DUML frame
+        var offset = 0
+        if (raw.size >= 8 && raw[0] == 0x55.toByte() && raw[1] == 0xCC.toByte()) {
+            offset = 8 // skip RCLink header
+        }
+        if (offset + 13 > raw.size) return
+        val frame = raw.copyOfRange(offset, raw.size)
+        if (frame[0] != 0x55.toByte() || frame.size < 13) return
+
+        val sender = frame[4].toInt() and 0xFF
+        val dst = frame[5].toInt() and 0xFF
+        val seq = (frame[6].toInt() and 0xFF) or ((frame[7].toInt() and 0xFF) shl 8)
+        val cmdType = frame[8].toInt() and 0xFF
+        val cmdSet = frame[9].toInt() and 0xFF
+        val cmdId = frame[10].toInt() and 0xFF
+        val isResponse = (cmdType and 0x80) != 0
+        val payloadLen = frame.size - 13
+        val payloadHex = if (payloadLen > 0) {
+            frame.copyOfRange(11, 11 + minOf(payloadLen, 16)).joinToString(" ") { "%02X".format(it) }
+        } else ""
+
+        val tag = if (isResponse) "RX RSP" else "RX REQ"
+        log("$tag %02X→%02X seq=$seq set=%02X id=%02X${if (payloadLen > 0) " [$payloadHex]" else ""}".format(sender, dst, cmdSet, cmdId))
     }
 
     private fun update(block: AppState.() -> AppState) {

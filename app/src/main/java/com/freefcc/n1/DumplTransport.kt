@@ -98,6 +98,9 @@ class AccessoryTransport private constructor(
     @Volatile
     private var lastRoute: ByteArray = byteArrayOf(0x49, 0x57)
 
+    /** Optional listener for received DUML frames — used for diagnostics. */
+    var rxListener: ((ByteArray) -> Unit)? = null
+
     override fun open(): Boolean {
         if (running.compareAndSet(false, true)) {
             // Start RX drain thread — continuously reads from the USB input
@@ -115,6 +118,14 @@ class AccessoryTransport private constructor(
                         }
                         if (n >= 4 && buf[0] == 0x55.toByte() && buf[1] == 0xCC.toByte()) {
                             lastRoute = byteArrayOf(buf[2], buf[3])
+                        }
+                        // Log received DUML frames for diagnostics
+                        if (n >= 13) {
+                            val rxLog = rxListener
+                            if (rxLog != null) {
+                                val frame = buf.copyOfRange(0, n)
+                                rxLog(frame)
+                            }
                         }
                     } catch (_: IOException) {
                         running.set(false)
