@@ -407,7 +407,7 @@ private fun AboutPage() {
             Spacer(Modifier.height(16.dp))
             DividerLine()
             Spacer(Modifier.height(16.dp))
-            InfoRow("Version", "2.0")
+            InfoRow("Version", "2.1")
             Spacer(Modifier.height(12.dp))
             InfoRow("License", "AGPL-3.0")
             Spacer(Modifier.height(12.dp))
@@ -459,7 +459,7 @@ private fun AppHeader(state: AppState) {
         Spacer(Modifier.height(6.dp))
         Text(
             buildString {
-                append("v2.0")
+                append("v2.1")
                 if (state.transportKind.isNotEmpty()) append(" · ${state.transportKind}")
             },
             color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium
