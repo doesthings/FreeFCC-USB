@@ -101,6 +101,15 @@ class AccessoryTransport private constructor(
     /** Optional listener for received DUML frames — used for diagnostics. */
     var rxListener: ((ByteArray) -> Unit)? = null
 
+    /** Aircraft serial extracted from telemetry. Empty until detected. */
+    @Volatile
+    var detectedSerial: String = ""
+        private set
+
+    private val serialPattern = Regex("1581[0-9A-Z]{12,18}")
+    private val modelPattern = Regex("W[AM][0-9]{3}")
+    private val rxBuffer = StringBuilder()
+
     override fun open(): Boolean {
         if (running.compareAndSet(false, true)) {
             // Start RX drain thread — continuously reads from the USB input
@@ -118,6 +127,18 @@ class AccessoryTransport private constructor(
                         }
                         if (n >= 4 && buf[0] == 0x55.toByte() && buf[1] == 0xCC.toByte()) {
                             lastRoute = byteArrayOf(buf[2], buf[3])
+                        }
+                        // Scan for aircraft serial in telemetry stream
+                        if (detectedSerial.isEmpty() && n > 0) {
+                            rxBuffer.append(String(buf, 0, n, Charsets.ISO_8859_1))
+                            if (rxBuffer.length > 32768) rxBuffer.delete(0, rxBuffer.length - 16384)
+                            val fullMatch = serialPattern.find(rxBuffer)
+                            if (fullMatch != null) {
+                                detectedSerial = fullMatch.value
+                            } else {
+                                val modelMatch = modelPattern.find(rxBuffer)
+                                if (modelMatch != null) detectedSerial = modelMatch.value
+                            }
                         }
                         // Log received DUML frames for diagnostics
                         if (n >= 13) {
@@ -216,7 +237,12 @@ class AccessoryTransport private constructor(
 
         private const val ACTION_USB_PERMISSION = "com.freefcc.n1.USB_PERMISSION"
 
-        fun open(context: Context): AccessoryTransport? {
+        /**
+         * @param requestPermission ask the user for USB permission if we do not
+         *   have it yet. Connect retries in a loop, so only the first attempt
+         *   passes true — otherwise the permission dialog is raised repeatedly.
+         */
+        fun open(context: Context, requestPermission: Boolean = true): AccessoryTransport? {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
             val accessories = usbManager.accessoryList
@@ -227,6 +253,7 @@ class AccessoryTransport private constructor(
             if (accessory.manufacturer != "DJI") return null
 
             if (!usbManager.hasPermission(accessory)) {
+                if (!requestPermission) return null
                 val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
                     PendingIntent.FLAG_MUTABLE else 0
                 val pi = PendingIntent.getBroadcast(
@@ -269,11 +296,16 @@ class VcomTransport private constructor(
     private val usbInterface: UsbInterface,
     private val epOut: UsbEndpoint,
     private val epIn: UsbEndpoint,
-    override val name: String
+    override val name: String,
+    /** False when the device was matched by endpoint shape, not by DJI's vendor ID. */
+    val isRecognizedDji: Boolean
 ) : DumplTransport {
 
     private val running = AtomicBoolean(false)
     private var rxThread: Thread? = null
+
+    /** Optional listener for received DUML frames — used for diagnostics. */
+    var rxListener: ((ByteArray) -> Unit)? = null
 
     override fun open(): Boolean {
         if (running.compareAndSet(false, true)) {
@@ -282,6 +314,7 @@ class VcomTransport private constructor(
                 while (running.get()) {
                     val n = connection.bulkTransfer(epIn, buf, buf.size, 1000)
                     if (n < 0 && !running.get()) break
+                    if (n >= 13) rxListener?.invoke(buf.copyOfRange(0, n))
                 }
             }, "VCOM-RX").apply { isDaemon = true; start() }
         }
@@ -309,12 +342,14 @@ class VcomTransport private constructor(
         private const val DJI_VENDOR_ID = 11427
         private const val ACTION_USB_PERMISSION = "com.freefcc.n1.USB_PERMISSION_VCOM"
 
-        fun open(context: Context): VcomTransport? {
+        /** @param requestPermission see [AccessoryTransport.open]. */
+        fun open(context: Context, requestPermission: Boolean = true): VcomTransport? {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
             val device = findDjiDevice(usbManager) ?: return null
 
             if (!usbManager.hasPermission(device)) {
+                if (!requestPermission) return null
                 val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
                     PendingIntent.FLAG_MUTABLE else 0
                 val pi = PendingIntent.getBroadcast(
@@ -350,17 +385,25 @@ class VcomTransport private constructor(
 
             return VcomTransport(
                 conn, endpoints.iface, endpoints.epOut, endpoints.epIn,
-                "USB VCOM: ${device.vendorId}/${device.productId}"
+                "USB VCOM: ${device.vendorId}/${device.productId}",
+                isDjiVendor(device)
             )
         }
 
+        /**
+         * A DJI aircraft is identified by its vendor ID. Only if nothing on the
+         * bus matches does this fall back to any device exposing bulk endpoints
+         * — a phone with a dock or hub attached would otherwise get picked up
+         * and reported as a successful connection.
+         */
         private fun findDjiDevice(usbManager: UsbManager): UsbDevice? {
-            for (device in usbManager.deviceList.values) {
-                if (device.vendorId == DJI_VENDOR_ID) return device
-                if (findBulkEndpoints(device) != null) return device
-            }
-            return null
+            val devices = usbManager.deviceList.values
+            devices.firstOrNull { it.vendorId == DJI_VENDOR_ID }?.let { return it }
+            return devices.firstOrNull { findBulkEndpoints(it) != null }
         }
+
+        /** True when the device was matched by DJI's vendor ID rather than by shape. */
+        fun isDjiVendor(device: UsbDevice): Boolean = device.vendorId == DJI_VENDOR_ID
 
         private data class Endpoints(val iface: UsbInterface, val epOut: UsbEndpoint, val epIn: UsbEndpoint)
 

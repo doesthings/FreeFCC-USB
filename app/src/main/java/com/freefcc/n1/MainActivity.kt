@@ -174,21 +174,42 @@ private fun FccPage(state: AppState, viewModel: FccViewModel) {
                 state.isBusy -> {
                     ProgressDisplay(state.busyProgress, state.message)
                 }
+                state.status == "released" -> {
+                    BodyText(
+                        "USB released. Open DJI Fly and check Transmission — it should " +
+                        "read FCC.\n\nIf it reads CE, come back, reconnect and apply again. " +
+                        "Some drones also drop to CE the moment they set the home point on " +
+                        "GPS lock, so it can need a second pass once you're outside.",
+                        Green
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    GlowButton("Reconnect", Cyan) { viewModel.connect() }
+                }
                 !state.isConnected -> {
                     BodyText(
-                        "Close DJI Fly, then connect your phone to the TOP USB port of the " +
-                        "RC-N1/RC-N2/RC-N3 (the service port), then tap Connect. " +
-                        "If that doesn't work, try the TOP port."
+                        "Plug your phone into the TOP USB port of the RC-N1/RC-N2/RC-N3 " +
+                        "(the service port) and tap Connect. Close DJI Fly first — it holds " +
+                        "the port. Connect keeps retrying for 15s, so you can also tap it " +
+                        "first and then close DJI Fly.\n\n" +
+                        "Alternatively, plug straight into the drone's USB-C port for " +
+                        "direct-to-drone mode."
                     )
                     Spacer(Modifier.height(20.dp))
                     GlowButton("Connect", Cyan) { viewModel.connect() }
                 }
                 state.isFccEnabled -> {
-                    BodyText("FCC mode is active.", Green)
+                    BodyText(
+                        "FCC applied. Re-applying every few seconds to hold it.\n\n" +
+                        "DJI Fly can't use the controller while this app holds the USB — " +
+                        "tap Release to hand the port back without unplugging the cable.",
+                        Green
+                    )
                     Spacer(Modifier.height(20.dp))
-                    GlowButton("Stop FCC Mode", Red) { viewModel.disableFcc() }
+                    GlowButton("Release USB for DJI Fly", Green) { viewModel.releaseUsb() }
                     Spacer(Modifier.height(12.dp))
                     GlowButton("Re-Apply FCC", Cyan, filled = false) { viewModel.enableFcc() }
+                    Spacer(Modifier.height(12.dp))
+                    GlowButton("Stop FCC Mode", Red, filled = false) { viewModel.disableFcc() }
                 }
                 else -> {
                     if (state.message.isNotEmpty()) {
@@ -407,7 +428,7 @@ private fun AboutPage() {
             Spacer(Modifier.height(16.dp))
             DividerLine()
             Spacer(Modifier.height(16.dp))
-            InfoRow("Version", "2.1")
+            InfoRow("Version", "2.2")
             Spacer(Modifier.height(12.dp))
             InfoRow("License", "AGPL-3.0")
             Spacer(Modifier.height(12.dp))
@@ -459,7 +480,7 @@ private fun AppHeader(state: AppState) {
         Spacer(Modifier.height(6.dp))
         Text(
             buildString {
-                append("v2.1")
+                append("v2.2")
                 if (state.transportKind.isNotEmpty()) append(" · ${state.transportKind}")
             },
             color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium

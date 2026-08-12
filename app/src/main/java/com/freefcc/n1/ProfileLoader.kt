@@ -30,6 +30,7 @@ object ProfileLoader {
         val interFrameDelay: Long,
         val interRoundDelay: Long,
         val readWindowMs: Int,
+        val repeatIntervalMs: Long,
         val frameDefs: List<FrameDef>
     )
 
@@ -44,6 +45,7 @@ object ProfileLoader {
         val interFrame = obj.optLong("inter_frame_delay_ms", 0)
         val interRound = obj.optLong("inter_round_delay_ms", 0)
         val readWindow = obj.optInt("read_window_ms", 80)
+        val repeatInterval = obj.optLong("repeat_interval_ms", 8000)
 
         val framesArray = obj.getJSONArray("frames")
         val defs = (0 until framesArray.length()).map { i ->
@@ -56,7 +58,7 @@ object ProfileLoader {
             )
         }
 
-        return Profile(sender, cmdType, rounds, interFrame, interRound, readWindow, defs)
+        return Profile(sender, cmdType, rounds, interFrame, interRound, readWindow, repeatInterval, defs)
     }
 
     /** Builds a wire-ready DUML frame from a definition, using the global sequence counter. */

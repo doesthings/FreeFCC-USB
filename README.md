@@ -173,10 +173,24 @@ The app:
 ### Step 6: Enable FCC mode
 
 1. Once connected, tap the **Enable FCC Mode** button
-2. Wait for the progress bar to complete (sends 21 frames in 2 rounds)
-3. You should see a green checkmark and "FCC mode enabled" message
+2. Wait for the progress bar to complete. Each apply sweeps every command path
+   that is known to work on some hardware, then keeps re-applying in the
+   background
+3. You should see a green checkmark and "FCC applied"
+4. Open the **Log** tab and look for a line like `profile@82: 3 responses`. That
+   tells you which path your controller answered on — worth including if you
+   file an issue
 
-### Step 7: Open DJI Fly and verify
+### Step 7: Hand the USB back to DJI Fly
+
+Tap **Release USB for DJI Fly**. While this app holds the USB accessory, DJI Fly
+cannot connect to the controller — the accessory is exclusive to one app at a
+time. Releasing hands the port back without unplugging the cable.
+
+> Background repeat stops when you release. If the radio flips back to CE, tap
+> **Reconnect** and apply again.
+
+### Step 8: Open DJI Fly and verify
 
 1. **Keep the USB cable connected to the TOP port** (don't switch ports)
 2. Open DJI Fly
@@ -202,7 +216,7 @@ Check the images below for reference:
 </tr>
 </table>
 
-### Step 8: Fly!
+### Step 9: Fly!
 
 If the signal graph shows FCC mode, you're done. Go fly and enjoy the extra range.
 
@@ -214,7 +228,9 @@ If the signal graph shows FCC mode, you're done. Go fly and enjoy the extra rang
 |---------|---------|
 | "Controller not found" | **Force-close DJI Fly** (Settings → Apps → DJI Fly → Force Stop). Make sure you're on the **TOP** port. Try a different USB-C cable. |
 | "FCC apply failed" | The DUMPL writes failed. Make sure the drone is powered on. Try disconnecting and reconnecting, then tap Connect again. |
-| "Patched but still in CE mode" | Please [open an issue](https://github.com/doesthings/FreeFCC-USB/issues) with your drone model, controller model, and firmware version. |
+| "Patched but still in CE mode" | Apply again — some combinations take it on the second pass. Then check the **Log** tab: if every path shows `0 responses`, the controller is not relaying to the aircraft, which is different from FCC being rejected. Please [open an issue](https://github.com/doesthings/FreeFCC-USB/issues) with your drone model, controller model, firmware versions, and those log lines. |
+| DJI Fly won't connect after applying | Tap **Release USB for DJI Fly**. Only one app can hold the USB accessory at a time. |
+| Back in CE mode after going outside | Some aircraft reset the region when they set the home point on GPS lock. Reconnect and apply again once you have GPS. |
 | USB permission dialog doesn't appear | Unplug and replug the USB cable. Or go to Settings → Apps → FreeFCC USB → Permissions. |
 | DJI Fly keeps auto-launching | Go to Settings → Apps → DJI Fly → Open by default → Clear defaults. |
 
@@ -288,7 +304,20 @@ Without these keepalives, the controller may drop the session before the FCC seq
 10. Commit the region change
 11. Exit service mode
 
-The same 21 frames work on every DJI aircraft model — the profile is universal.
+The same 21 frames go to every DJI aircraft model — the profile is universal.
+
+**Timing matters.** Frame 1 opens the service-mode window and frame 21 closes it.
+Everything in between has to land inside that window, which is why the profile
+uses a 30ms inter-frame delay — one round takes about 0.65s. Stretch the sequence
+out over several seconds and the radio silently stays on CE even though every
+write "succeeded".
+
+**One apply sweeps several paths.** Which sender byte and which command the radio
+accepts turns out to vary across aircraft, controller and phone. Rather than
+guessing, each apply sends the profile as `0x82`, then as `0x02`, then the
+single-command WLM switch, and counts responses for each so the Log tab shows
+which one your hardware answered on. Passes are independent, so a path your
+hardware ignores costs nothing but its own runtime.
 
 ### Profile Format
 
